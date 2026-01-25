@@ -5,11 +5,10 @@
   --text: #eaeaea;
   --muted: #a7a7a7;
   --accent: #1db954; /* spotify-ish */
-  --accent2: #21e065;
 
   --radius: 18px;
 
-  /* Fixed proportional key sizing (prevents skinny keys) */
+  /* These are dynamically overridden by JS to keep proportions */
   --white-w: 46px;
   --white-h: min(62vh, 520px);
   --gap: 2px;
@@ -27,6 +26,7 @@ body{
   color: var(--text);
 }
 
+/* ===== Top Bar ===== */
 .topbar{
   position: sticky;
   top: 0;
@@ -56,6 +56,7 @@ body{
 .appname{ font-weight: 700; letter-spacing: 0.2px; }
 .subtitle{ color: var(--muted); font-size: 12px; margin-top: 4px; }
 
+/* ===== Layout ===== */
 .wrap{
   max-width: 1100px;
   margin: 0 auto;
@@ -73,16 +74,15 @@ body{
   overflow: hidden;
 }
 
-/* EDIT: Scroll container so key size stays proportional */
+/* IMPORTANT: no horizontal scrolling – keyboard always fits screen */
 .pianoScroll{
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
-/* Keyboard bed width is set by JS so keys don't shrink */
+/* Keyboard bed always fills width; JS scales keys + height */
 .piano{
+  width: 100%;
   position: relative;
   height: var(--white-h);
   user-select: none;
@@ -100,6 +100,7 @@ body{
   gap: var(--gap);
 }
 
+/* ===== Keys ===== */
 .key{
   position: relative;
   border-radius: 12px;
@@ -148,7 +149,7 @@ body{
 }
 
 .key .noteLabel{
-  opacity: 0.0;
+  opacity: 0;
   transform: translateY(3px);
   transition: opacity 0.12s ease, transform 0.12s ease;
   padding: 2px 8px;
@@ -159,9 +160,10 @@ body{
 
 .key.selected .noteLabel{
   opacity: 1;
-  transform: translateY(0px);
+  transform: translateY(0);
 }
 
+/* ===== Controls ===== */
 .controls{
   display: grid;
   grid-template-columns: 1fr;
@@ -227,10 +229,5 @@ body{
 }
 
 @media (max-width: 520px){
-  :root{
-    --white-w: 38px;
-    --black-w: 26px;
-    --white-h: min(66vh, 560px);
-  }
   .ctrlGroup{ grid-template-columns: 60px 1fr 60px; }
 }
