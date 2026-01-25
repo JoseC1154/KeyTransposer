@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#121212" />
+  <title>Piano Chord Transposer</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- iOS-ish nice-to-have -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <div class="titles">
+        <div class="appname">Piano Chord Transposer</div>
+        <div class="subtitle" id="rangeText">Range: —</div>
+      </div>
+    </div>
+
+    <button class="ghost" id="btnClear" type="button" title="Clear selection">
+      Clear
+    </button>
+  </header>
+
+  <main class="wrap">
+    <section class="pianoCard" aria-label="Piano">
+      <div class="piano" id="piano" role="application" aria-label="Interactive piano"></div>
+    </section>
+
+    <section class="controls" aria-label="Controls">
+      <div class="ctrlGroup">
+        <button class="ctrl" id="btnMinus" type="button" aria-label="Shrink keyboard">−</button>
+        <div class="ctrlLabel">
+          <div class="labelTitle">Keyboard</div>
+          <div class="labelValue" id="octaveText">—</div>
+        </div>
+        <button class="ctrl" id="btnPlus" type="button" aria-label="Grow keyboard">+</button>
+      </div>
+
+      <div class="ctrlGroup">
+        <button class="ctrl accent" id="btnDown" type="button" aria-label="Transpose down one semitone">▼</button>
+        <div class="ctrlLabel">
+          <div class="labelTitle">Transpose</div>
+          <div class="labelValue" id="transposeHint">Select keys, then shift</div>
+        </div>
+        <button class="ctrl accent" id="btnUp" type="button" aria-label="Transpose up one semitone">▲</button>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span id="status">Offline-ready.</span>
+    </footer>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
