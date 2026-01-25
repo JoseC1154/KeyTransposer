@@ -5,7 +5,7 @@ const IS_BLACK = new Set([1,3,6,8,10]); // C#, D#, F#, G#, A#
 let startMidi = 48;     // C3
 let octaves = 2;
 
-const MIN_OCTAVES = 1;
+const MIN_OCTAVES = 2;
 const MAX_OCTAVES = 7;
 
 let selectedMidis = new Set();
@@ -222,7 +222,39 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+function applyResponsiveSizing(){
+  // Fit all keys into the visible width by shrinking key width AND height proportionally.
+  // This keeps the keyboard proportional while expanding to the screen width (no horizontal scroll).
+  const whiteCount = octaves * 7; // 7 white keys per octave
+  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gap")) || 2;
+
+  const scrollW = elPianoScroll ? elPianoScroll.clientWidth : window.innerWidth;
+  const available = Math.max(280, scrollW - 20); // subtract piano padding-ish
+  const totalGap = (whiteCount - 1) * gap;
+
+  // Compute white key width that fits the screen
+  const whiteW = Math.max(24, Math.floor((available - totalGap) / whiteCount));
+
+  // Keep proportions: base ratio from original design (≈ 520 / 46)
+  const baseRatio = 520 / 46;
+  const maxH = Math.min(window.innerHeight * 0.66, 560);
+  const whiteH = Math.max(220, Math.min(maxH, Math.round(whiteW * baseRatio)));
+
+  document.documentElement.style.setProperty("--white-w", `${whiteW}px`);
+  document.documentElement.style.setProperty("--white-h", `${whiteH}px`);
+  document.documentElement.style.setProperty("--black-w", `${Math.round(whiteW * 0.65)}px`);
+  document.documentElement.style.setProperty("--black-h", `${Math.round(whiteH * 0.62)}px`);
+}
+
+// Recompute sizing on resize/orientation changes
+window.addEventListener("resize", () => {
+  applyResponsiveSizing();
+  renderPiano();
+  updateSelectionUI();
+});
+
 // Init
+applyResponsiveSizing();
 renderPiano();
 updateHeader();
 updateHint();
