@@ -5,7 +5,7 @@ const IS_BLACK = new Set([1,3,6,8,10]); // C#, D#, F#, G#, A#
 let startMidi = 48;     // C3
 let octaves = 2;
 
-const MIN_OCTAVES = 2;  // ✅ minimum 2 octaves
+const MIN_OCTAVES = 2;
 const MAX_OCTAVES = 7;
 
 let selectedMidis = new Set();
@@ -16,6 +16,10 @@ const elRangeText = document.getElementById("rangeText");
 const elOctaveText = document.getElementById("octaveText");
 const elStatus = document.getElementById("status");
 const elTransposeHint = document.getElementById("transposeHint");
+
+const elTopbar = document.getElementById("topbar");
+const elControls = document.getElementById("controls");
+const elFooter = document.getElementById("footer");
 
 document.getElementById("btnPlus").addEventListener("click", () => {
   if (octaves < MAX_OCTAVES) { octaves += 1; applyResponsiveSizing(); rebuild(); }
@@ -51,7 +55,6 @@ function rangeMidis(){
   return { min: startMidi, max: endExclusive - 1, endExclusive };
 }
 
-// Wrap helper so transposed notes never “disappear” outside the current range
 function wrapIntoRange(midi, min, max){
   const span = (max - min) + 1;
   let x = midi;
@@ -67,7 +70,7 @@ function transposeSelection(deltaSemitone){
 
   const next = new Set();
   for (const m of selectedMidis){
-    const shifted = m + deltaSemitone; // ✅ true semitone
+    const shifted = m + deltaSemitone; // true semitone
     next.add(wrapIntoRange(shifted, min, max));
   }
 
@@ -78,13 +81,13 @@ function transposeSelection(deltaSemitone){
 
 function updateHint(){
   if (selectedMidis.size === 0) {
-    elTransposeHint.textContent = "Select keys, then shift";
+    elTransposeHint.textContent = "Select keys";
     return;
   }
   const ordered = [...selectedMidis].sort((a,b)=>a-b);
   const pcs = ordered.map(midiToPitchClassName);
   const uniq = [...new Set(pcs)];
-  elTransposeHint.textContent = `Selected: ${uniq.join(" - ")} (${selectedMidis.size})`;
+  elTransposeHint.textContent = uniq.join(" - ");
 }
 
 function handleKeyToggle(midi){
@@ -108,30 +111,39 @@ function rebuild(){
 function updateHeader(){
   const { min, max } = rangeMidis();
   elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)}`;
-  elOctaveText.textContent = `${octaves} octave${octaves === 1 ? "" : "s"}`;
+  elOctaveText.textContent = `${octaves}`;
 }
 
 function applyResponsiveSizing(){
-  // No scrolling: ALL keys must fit on screen.
-  // So we compute key width that fits the available width, and shrink height proportionally.
+  // Goal:
+  // 1) No vertical scrolling needed on mobile to reach controls.
+  // 2) No horizontal scrolling; ALL keys always visible.
+  // So we compute key width to fit the screen, then compute a proportional height
+  // that fits within the remaining viewport height.
 
   const whiteCount = octaves * 7; // 7 white keys per octave
   const rootStyles = getComputedStyle(document.documentElement);
   const gap = parseFloat(rootStyles.getPropertyValue("--gap")) || 2;
 
+  // Width budget
   const containerW = elPianoScroll ? elPianoScroll.clientWidth : window.innerWidth;
   const paddingAllowance = 20; // .piano padding left+right (10 + 10)
-  const available = Math.max(280, containerW - paddingAllowance);
-
+  const availableW = Math.max(280, containerW - paddingAllowance);
   const totalGap = (whiteCount - 1) * gap;
+  const whiteW = Math.max(18, (availableW - totalGap) / whiteCount);
 
-  // Use float to avoid cumulative rounding overflow.
-  const whiteW = Math.max(18, (available - totalGap) / whiteCount);
+  // Height budget: viewport minus header/controls/footer and layout gaps
+  const topH = elTopbar ? elTopbar.offsetHeight : 0;
+  const controlsH = elControls ? elControls.offsetHeight : 0;
+  const footerH = elFooter ? elFooter.offsetHeight : 0;
 
-  // Proportional height: based on original design ratio (≈ 520 / 46)
+  // Wrap padding + gaps (safe buffer)
+  const safe = 28;
+  const availableH = Math.max(200, window.innerHeight - topH - controlsH - footerH - safe);
+
+  // Proportional height based on original ratio (≈ 520 / 46)
   const baseRatio = 520 / 46;
-  const maxH = Math.min(window.innerHeight * 0.66, 560);
-  const whiteH = Math.max(200, Math.min(maxH, whiteW * baseRatio));
+  const whiteH = Math.max(170, Math.min(availableH, whiteW * baseRatio));
 
   document.documentElement.style.setProperty("--white-w", `${whiteW.toFixed(3)}px`);
   document.documentElement.style.setProperty("--white-h", `${whiteH.toFixed(3)}px`);
@@ -156,17 +168,14 @@ function renderPiano(){
       keys.push({ midi, isBlack: false, whiteIndex });
       whiteIndex++;
     } else {
-      // Black key sits after previous white
       keys.push({ midi, isBlack: true, anchorWhiteIndex: whiteIndex - 1 });
     }
   }
 
-  // White row
   const whiteRow = document.createElement("div");
   whiteRow.className = "whiteRow";
   elPiano.appendChild(whiteRow);
 
-  // Render whites
   const whites = keys.filter(k => !k.isBlack);
   for (const k of whites){
     const div = document.createElement("div");
@@ -186,11 +195,11 @@ function renderPiano(){
     whiteRow.appendChild(div);
   }
 
-  // Render blacks (stable pixel math that fits because whiteW was computed to fit the container)
-  const rootStyles = getComputedStyle(document.documentElement);
-  const whiteW = parseFloat(rootStyles.getPropertyValue("--white-w")) || 46;
-  const gap = parseFloat(rootStyles.getPropertyValue("--gap")) || 2;
-  const blackW = parseFloat(rootStyles.getPropertyValue("--black-w")) || (whiteW * 0.65);
+  // Blacks: pixel math using computed CSS vars
+  const rs = getComputedStyle(document.documentElement);
+  const whiteW = parseFloat(rs.getPropertyValue("--white-w")) || 46;
+  const gap = parseFloat(rs.getPropertyValue("--gap")) || 2;
+  const blackW = parseFloat(rs.getPropertyValue("--black-w")) || (whiteW * 0.65);
 
   const blacks = keys.filter(k => k.isBlack);
   for (const k of blacks){
@@ -210,7 +219,6 @@ function renderPiano(){
       handleKeyToggle(k.midi);
     });
 
-    // anchor white left + white width + half gap - half black width + piano padding
     const leftPx = (k.anchorWhiteIndex * (whiteW + gap)) + whiteW + (gap / 2) - (blackW / 2) + 10;
     div.style.left = `${leftPx}px`;
 
@@ -226,7 +234,6 @@ function updateSelectionUI(){
   }
 }
 
-// Recompute sizing on resize/orientation changes
 window.addEventListener("resize", () => {
   applyResponsiveSizing();
   renderPiano();
@@ -235,7 +242,6 @@ window.addEventListener("resize", () => {
   updateHint();
 });
 
-// Service worker registration
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
     try {
