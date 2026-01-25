@@ -6,15 +6,16 @@
   --muted: #a7a7a7;
   --accent: #1db954; /* spotify-ish */
   --accent2: #21e065;
-  --danger: #ff4d4d;
 
   --radius: 18px;
 
-  /* piano sizing (controlled by JS too) */
-  --white-count: 14;
+  /* Fixed proportional key sizing (prevents skinny keys) */
+  --white-w: 46px;
   --white-h: min(62vh, 520px);
+  --gap: 2px;
+
+  --black-w: 30px;
   --black-h: calc(var(--white-h) * 0.62);
-  --black-w: calc(100% / var(--white-count) * 0.62);
 }
 
 *{ box-sizing: border-box; }
@@ -72,19 +73,31 @@ body{
   overflow: hidden;
 }
 
+/* EDIT: Scroll container so key size stays proportional */
+.pianoScroll{
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Keyboard bed width is set by JS so keys don't shrink */
 .piano{
   position: relative;
   height: var(--white-h);
-  width: 100%;
   user-select: none;
   touch-action: manipulation;
   padding: 10px 10px 12px;
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
   background:
     radial-gradient(900px 260px at 50% 0%, rgba(29,185,84,0.10), transparent 60%),
     linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+}
+
+.whiteRow{
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  gap: var(--gap);
 }
 
 .key{
@@ -100,8 +113,8 @@ body{
 }
 
 .key.white{
-  flex: 1 1 auto;
-  min-width: 18px;
+  width: var(--white-w);
+  height: 100%;
   background: linear-gradient(180deg, #f6f6f6, #dcdcdc);
   color: #111;
   box-shadow: inset 0 -7px 15px rgba(0,0,0,0.20);
@@ -122,9 +135,7 @@ body{
   padding-bottom: 12px;
 }
 
-.key:active{
-  transform: translateY(1px) scale(0.995);
-}
+.key:active{ transform: translateY(1px) scale(0.995); }
 
 .key.selected.white{
   background: linear-gradient(180deg, #eafff1, #bff3d1);
@@ -215,12 +226,11 @@ body{
   padding: 4px 2px;
 }
 
-/* Small screens: give piano more height */
 @media (max-width: 520px){
   :root{
+    --white-w: 38px;
+    --black-w: 26px;
     --white-h: min(66vh, 560px);
   }
-  .ctrlGroup{
-    grid-template-columns: 60px 1fr 60px;
-  }
+  .ctrlGroup{ grid-template-columns: 60px 1fr 60px; }
 }
