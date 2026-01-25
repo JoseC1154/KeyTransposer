@@ -1,260 +1,66 @@
-const NOTES_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-const IS_BLACK = new Set([1,3,6,8,10]); // C#, D#, F#, G#, A#
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#121212" />
+  <title>Piano Chord Transposer</title>
 
-// Start on a real C so labeling is correct: C3 = MIDI 48
-let startMidi = 48;     // C3
-let octaves = 2;
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
 
-const MIN_OCTAVES = 2;
-const MAX_OCTAVES = 7;
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+<body>
 
-let selectedMidis = new Set();
+  <!-- ===== TOP BAR ===== -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <div class="titles">
+        <div class="appname">Piano Chord Transposer</div>
+        <div class="subtitle" id="rangeText">Range: —</div>
+      </div>
+    </div>
+    <button class="ghost" id="btnClear" type="button">Clear</button>
+  </header>
 
-const elPiano = document.getElementById("piano");
-const elPianoScroll = document.getElementById("pianoScroll");
-const elRangeText = document.getElementById("rangeText");
-const elOctaveText = document.getElementById("octaveText");
-const elStatus = document.getElementById("status");
-const elTransposeHint = document.getElementById("transposeHint");
+  <main class="wrap">
 
-const elTopbar = document.getElementById("topbar");
-const elControls = document.getElementById("controls");
-const elFooter = document.getElementById("footer");
+    <!-- ===== PIANO ===== -->
+    <section class="pianoCard" aria-label="Piano">
+      <div class="pianoScroll" id="pianoScroll">
+        <div class="piano" id="piano" role="application" aria-label="Interactive piano"></div>
+      </div>
+    </section>
 
-document.getElementById("btnPlus").addEventListener("click", () => {
-  if (octaves < MAX_OCTAVES) { octaves += 1; applyResponsiveSizing(); rebuild(); }
-});
-document.getElementById("btnMinus").addEventListener("click", () => {
-  if (octaves > MIN_OCTAVES) { octaves -= 1; applyResponsiveSizing(); rebuild(); }
-});
+    <!-- ===== SINGLE-LINE CONTROL BAR (NO SCROLL ON MOBILE) ===== -->
+    <section class="controlBar" id="controls" aria-label="Controls">
+      <button class="ctrl mini" id="btnMinus" type="button" aria-label="Remove octave">−</button>
+      <button class="ctrl mini" id="btnPlus" type="button" aria-label="Add octave">+</button>
 
-// Semitone transpose (±1 MIDI)
-document.getElementById("btnUp").addEventListener("click", () => transposeSelection(+1));
-document.getElementById("btnDown").addEventListener("click", () => transposeSelection(-1));
+      <div class="hud">
+        <div class="hudRow">
+          <span class="hudLabel">Oct:</span>
+          <span class="hudValue" id="octaveText">—</span>
+        </div>
+        <div class="hudRow">
+          <span class="hudLabel">Sel:</span>
+          <span class="hudValue" id="transposeHint">Select keys</span>
+        </div>
+      </div>
 
-document.getElementById("btnClear").addEventListener("click", () => {
-  selectedMidis.clear();
-  updateSelectionUI();
-  updateHint();
-});
+      <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
+      <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
+    </section>
 
-function midiToPitchClass(midi){
-  return (midi % 12 + 12) % 12;
-}
-function midiToPitchClassName(midi){
-  return NOTES_SHARP[midiToPitchClass(midi)];
-}
-function midiToNote(midi){
-  const pc = midiToPitchClass(midi);
-  const octaveNum = Math.floor(midi / 12) - 1; // 60 = C4
-  return `${NOTES_SHARP[pc]}${octaveNum}`;
-}
+    <footer class="footer" id="footer">
+      <span id="status">Offline-ready.</span>
+    </footer>
 
-function rangeMidis(){
-  const endExclusive = startMidi + (octaves * 12);
-  return { min: startMidi, max: endExclusive - 1, endExclusive };
-}
+  </main>
 
-function wrapIntoRange(midi, min, max){
-  const span = (max - min) + 1;
-  let x = midi;
-  while (x < min) x += span;
-  while (x > max) x -= span;
-  return x;
-}
-
-function transposeSelection(deltaSemitone){
-  if (selectedMidis.size === 0) return;
-
-  const { min, max } = rangeMidis();
-
-  const next = new Set();
-  for (const m of selectedMidis){
-    const shifted = m + deltaSemitone; // true semitone
-    next.add(wrapIntoRange(shifted, min, max));
-  }
-
-  selectedMidis = next;
-  updateSelectionUI();
-  updateHint();
-}
-
-function updateHint(){
-  if (selectedMidis.size === 0) {
-    elTransposeHint.textContent = "Select keys";
-    return;
-  }
-  const ordered = [...selectedMidis].sort((a,b)=>a-b);
-  const pcs = ordered.map(midiToPitchClassName);
-  const uniq = [...new Set(pcs)];
-  elTransposeHint.textContent = uniq.join(" - ");
-}
-
-function handleKeyToggle(midi){
-  if (selectedMidis.has(midi)) selectedMidis.delete(midi);
-  else selectedMidis.add(midi);
-  updateSelectionUI();
-  updateHint();
-}
-
-function rebuild(){
-  // keep selection in range (wrap)
-  const { min, max } = rangeMidis();
-  selectedMidis = new Set([...selectedMidis].map(m => wrapIntoRange(m, min, max)));
-
-  renderPiano();
-  updateSelectionUI();
-  updateHeader();
-  updateHint();
-}
-
-function updateHeader(){
-  const { min, max } = rangeMidis();
-  elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)}`;
-  elOctaveText.textContent = `${octaves}`;
-}
-
-function applyResponsiveSizing(){
-  // Goal:
-  // 1) No vertical scrolling needed on mobile to reach controls.
-  // 2) No horizontal scrolling; ALL keys always visible.
-  // So we compute key width to fit the screen, then compute a proportional height
-  // that fits within the remaining viewport height.
-
-  const whiteCount = octaves * 7; // 7 white keys per octave
-  const rootStyles = getComputedStyle(document.documentElement);
-  const gap = parseFloat(rootStyles.getPropertyValue("--gap")) || 2;
-
-  // Width budget
-  const containerW = elPianoScroll ? elPianoScroll.clientWidth : window.innerWidth;
-  const paddingAllowance = 20; // .piano padding left+right (10 + 10)
-  const availableW = Math.max(280, containerW - paddingAllowance);
-  const totalGap = (whiteCount - 1) * gap;
-  const whiteW = Math.max(18, (availableW - totalGap) / whiteCount);
-
-  // Height budget: viewport minus header/controls/footer and layout gaps
-  const topH = elTopbar ? elTopbar.offsetHeight : 0;
-  const controlsH = elControls ? elControls.offsetHeight : 0;
-  const footerH = elFooter ? elFooter.offsetHeight : 0;
-
-  // Wrap padding + gaps (safe buffer)
-  const safe = 28;
-  const availableH = Math.max(200, window.innerHeight - topH - controlsH - footerH - safe);
-
-  // Proportional height based on original ratio (≈ 520 / 46)
-  const baseRatio = 520 / 46;
-  const whiteH = Math.max(170, Math.min(availableH, whiteW * baseRatio));
-
-  document.documentElement.style.setProperty("--white-w", `${whiteW.toFixed(3)}px`);
-  document.documentElement.style.setProperty("--white-h", `${whiteH.toFixed(3)}px`);
-  document.documentElement.style.setProperty("--black-w", `${(whiteW * 0.65).toFixed(3)}px`);
-  document.documentElement.style.setProperty("--black-h", `${(whiteH * 0.62).toFixed(3)}px`);
-}
-
-function renderPiano(){
-  elPiano.innerHTML = "";
-
-  const { endExclusive } = rangeMidis();
-
-  // Build keys while tracking white positions (stable)
-  const keys = [];
-  let whiteIndex = 0;
-
-  for (let midi = startMidi; midi < endExclusive; midi++){
-    const pc = midiToPitchClass(midi);
-    const isBlack = IS_BLACK.has(pc);
-
-    if (!isBlack) {
-      keys.push({ midi, isBlack: false, whiteIndex });
-      whiteIndex++;
-    } else {
-      keys.push({ midi, isBlack: true, anchorWhiteIndex: whiteIndex - 1 });
-    }
-  }
-
-  const whiteRow = document.createElement("div");
-  whiteRow.className = "whiteRow";
-  elPiano.appendChild(whiteRow);
-
-  const whites = keys.filter(k => !k.isBlack);
-  for (const k of whites){
-    const div = document.createElement("div");
-    div.className = "key white";
-    div.dataset.midi = String(k.midi);
-
-    const lbl = document.createElement("div");
-    lbl.className = "noteLabel";
-    lbl.textContent = midiToPitchClassName(k.midi);
-    div.appendChild(lbl);
-
-    div.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      handleKeyToggle(k.midi);
-    });
-
-    whiteRow.appendChild(div);
-  }
-
-  // Blacks: pixel math using computed CSS vars
-  const rs = getComputedStyle(document.documentElement);
-  const whiteW = parseFloat(rs.getPropertyValue("--white-w")) || 46;
-  const gap = parseFloat(rs.getPropertyValue("--gap")) || 2;
-  const blackW = parseFloat(rs.getPropertyValue("--black-w")) || (whiteW * 0.65);
-
-  const blacks = keys.filter(k => k.isBlack);
-  for (const k of blacks){
-    if (k.anchorWhiteIndex < 0) continue;
-
-    const div = document.createElement("div");
-    div.className = "key black";
-    div.dataset.midi = String(k.midi);
-
-    const lbl = document.createElement("div");
-    lbl.className = "noteLabel";
-    lbl.textContent = midiToPitchClassName(k.midi);
-    div.appendChild(lbl);
-
-    div.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      handleKeyToggle(k.midi);
-    });
-
-    const leftPx = (k.anchorWhiteIndex * (whiteW + gap)) + whiteW + (gap / 2) - (blackW / 2) + 10;
-    div.style.left = `${leftPx}px`;
-
-    elPiano.appendChild(div);
-  }
-}
-
-function updateSelectionUI(){
-  const keys = elPiano.querySelectorAll(".key");
-  for (const k of keys){
-    const midi = Number(k.dataset.midi);
-    k.classList.toggle("selected", selectedMidis.has(midi));
-  }
-}
-
-window.addEventListener("resize", () => {
-  applyResponsiveSizing();
-  renderPiano();
-  updateSelectionUI();
-  updateHeader();
-  updateHint();
-});
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", async () => {
-    try {
-      const reg = await navigator.serviceWorker.register("./service-worker.js");
-      elStatus.textContent = reg.active ? "Offline-ready." : "Service worker installed.";
-    } catch {
-      elStatus.textContent = "Offline not available (SW failed).";
-    }
-  });
-}
-
-// Init
-applyResponsiveSizing();
-renderPiano();
-updateHeader();
-updateHint();
+  <script src="app.js"></script>
+</body>
+</html>
