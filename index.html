@@ -9,13 +9,13 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- iOS-ish nice-to-have -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
-
 <body>
-  <header class="topbar">
+
+  <!-- ===== TOP BAR ===== -->
+  <header class="topbar" id="topbar">
     <div class="brand">
       <span class="dot"></span>
       <div class="titles">
@@ -23,43 +23,42 @@
         <div class="subtitle" id="rangeText">Range: —</div>
       </div>
     </div>
-
-    <button class="ghost" id="btnClear" type="button" title="Clear selection">
-      Clear
-    </button>
+    <button class="ghost" id="btnClear" type="button">Clear</button>
   </header>
 
   <main class="wrap">
+
+    <!-- ===== PIANO ===== -->
     <section class="pianoCard" aria-label="Piano">
-      <!-- EDIT: scroll container so keys keep proportional width -->
       <div class="pianoScroll" id="pianoScroll">
         <div class="piano" id="piano" role="application" aria-label="Interactive piano"></div>
       </div>
     </section>
 
-    <section class="controls" aria-label="Controls">
-      <div class="ctrlGroup">
-        <button class="ctrl" id="btnMinus" type="button" aria-label="Shrink keyboard">−</button>
-        <div class="ctrlLabel">
-          <div class="labelTitle">Keyboard</div>
-          <div class="labelValue" id="octaveText">—</div>
+    <!-- ===== SINGLE-LINE CONTROL BAR (NO SCROLL ON MOBILE) ===== -->
+    <section class="controlBar" id="controls" aria-label="Controls">
+      <button class="ctrl mini" id="btnMinus" type="button" aria-label="Remove octave">−</button>
+      <button class="ctrl mini" id="btnPlus" type="button" aria-label="Add octave">+</button>
+
+      <div class="hud">
+        <div class="hudRow">
+          <span class="hudLabel">Oct:</span>
+          <span class="hudValue" id="octaveText">—</span>
         </div>
-        <button class="ctrl" id="btnPlus" type="button" aria-label="Grow keyboard">+</button>
+        <div class="hudRow">
+          <span class="hudLabel">Sel:</span>
+          <span class="hudValue" id="transposeHint">Select keys</span>
+        </div>
       </div>
 
-      <div class="ctrlGroup">
-        <button class="ctrl accent" id="btnDown" type="button" aria-label="Transpose down one semitone">▼</button>
-        <div class="ctrlLabel">
-          <div class="labelTitle">Transpose</div>
-          <div class="labelValue" id="transposeHint">Select keys, then shift</div>
-        </div>
-        <button class="ctrl accent" id="btnUp" type="button" aria-label="Transpose up one semitone">▲</button>
-      </div>
+      <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
+      <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
     </section>
 
-    <footer class="footer">
+    <footer class="footer" id="footer">
       <span id="status">Offline-ready.</span>
     </footer>
+
   </main>
 
   <script src="app.js"></script>
