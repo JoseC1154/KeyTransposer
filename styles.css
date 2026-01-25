@@ -1,0 +1,226 @@
+:root{
+  --bg: #121212;
+  --card: #181818;
+  --card2: #1f1f1f;
+  --text: #eaeaea;
+  --muted: #a7a7a7;
+  --accent: #1db954; /* spotify-ish */
+  --accent2: #21e065;
+  --danger: #ff4d4d;
+
+  --radius: 18px;
+
+  /* piano sizing (controlled by JS too) */
+  --white-count: 14;
+  --white-h: min(62vh, 520px);
+  --black-h: calc(var(--white-h) * 0.62);
+  --black-w: calc(100% / var(--white-count) * 0.62);
+}
+
+*{ box-sizing: border-box; }
+html,body{ height: 100%; }
+body{
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: radial-gradient(1200px 700px at 20% 0%, #1a1a1a, var(--bg));
+  color: var(--text);
+}
+
+.topbar{
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 14px 14px 10px;
+  background: linear-gradient(to bottom, rgba(18,18,18,0.95), rgba(18,18,18,0.55));
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.brand{
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dot{
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 20px rgba(29,185,84,0.45);
+}
+.titles{ display:flex; flex-direction: column; line-height: 1.1; }
+.appname{ font-weight: 700; letter-spacing: 0.2px; }
+.subtitle{ color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+.wrap{
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 10px 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pianoCard{
+  background: linear-gradient(180deg, var(--card), var(--card2));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 35px rgba(0,0,0,0.45);
+  overflow: hidden;
+}
+
+.piano{
+  position: relative;
+  height: var(--white-h);
+  width: 100%;
+  user-select: none;
+  touch-action: manipulation;
+  padding: 10px 10px 12px;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  background:
+    radial-gradient(900px 260px at 50% 0%, rgba(29,185,84,0.10), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+}
+
+.key{
+  position: relative;
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10px;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  transition: transform 0.08s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.key.white{
+  flex: 1 1 auto;
+  min-width: 18px;
+  background: linear-gradient(180deg, #f6f6f6, #dcdcdc);
+  color: #111;
+  box-shadow: inset 0 -7px 15px rgba(0,0,0,0.20);
+  border: 1px solid rgba(0,0,0,0.18);
+}
+
+.key.black{
+  position: absolute;
+  top: 10px;
+  height: var(--black-h);
+  width: var(--black-w);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2a2a2a, #0b0b0b);
+  color: #eaeaea;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.55), inset 0 -8px 14px rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  z-index: 5;
+  padding-bottom: 12px;
+}
+
+.key:active{
+  transform: translateY(1px) scale(0.995);
+}
+
+.key.selected.white{
+  background: linear-gradient(180deg, #eafff1, #bff3d1);
+  box-shadow: 0 0 0 3px rgba(29,185,84,0.45), inset 0 -7px 15px rgba(0,0,0,0.15);
+}
+
+.key.selected.black{
+  background: linear-gradient(180deg, #1f6b3b, #0b2d17);
+  box-shadow: 0 0 0 3px rgba(29,185,84,0.45), 0 10px 20px rgba(0,0,0,0.55);
+}
+
+.key .noteLabel{
+  opacity: 0.0;
+  transform: translateY(3px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.18);
+}
+.key.black .noteLabel{ background: rgba(255,255,255,0.10); }
+
+.key.selected .noteLabel{
+  opacity: 1;
+  transform: translateY(0px);
+}
+
+.controls{
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.ctrlGroup{
+  display: grid;
+  grid-template-columns: 64px 1fr 64px;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.ctrl{
+  height: 54px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.ctrl:hover{ background: rgba(255,255,255,0.09); }
+.ctrl:active{ transform: translateY(1px); }
+
+.ctrl.accent{
+  background: rgba(29,185,84,0.12);
+  border-color: rgba(29,185,84,0.35);
+}
+.ctrl.accent:hover{ background: rgba(29,185,84,0.18); }
+
+.ctrlLabel .labelTitle{
+  font-size: 12px;
+  color: var(--muted);
+}
+.ctrlLabel .labelValue{
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ghost{
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
+  color: var(--text);
+  cursor: pointer;
+}
+.ghost:hover{ background: rgba(255,255,255,0.08); }
+
+.footer{
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 2px;
+}
+
+/* Small screens: give piano more height */
+@media (max-width: 520px){
+  :root{
+    --white-h: min(66vh, 560px);
+  }
+  .ctrlGroup{
+    grid-template-columns: 60px 1fr 60px;
+  }
+}
