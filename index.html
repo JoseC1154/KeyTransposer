@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css" />
 
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 </head>
 <body>
@@ -23,7 +24,8 @@
       <span class="dot"></span>
       <div class="titles">
         <div class="appname">Piano Chord Transposer</div>
-        <div class="subtitle" id="rangeText">Range: —</div>
+        $1
+        <div class="subtitle" id="chordNameText">Chord: —</div>
       </div>
     </div>
   </div>
@@ -138,7 +140,7 @@
         <div class="scalePickerRow">
           <select id="scaleSelect" aria-label="Select scale"></select>
           <button class="ghost" type="button" id="btnScaleAdd">Add</button>
-          <button class="ghost" type="button" id="btnScaleRemove">Remove</button>
+          <!-- Scale banks are fixed (12 keys). Removing scales is disabled. -->
         </div>
         <div class="modalHint" id="scaleListHint">Scales save locally on this device.</div>
       </div>
