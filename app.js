@@ -61,6 +61,10 @@ let bankChords = Array.from({ length: 12 }, () => Array.from({ length: 12 }, () 
 let activeSlot = -1;
 let activeChordName = "";
 
+// Last detected chord root (pitch class) for roman-numeral labeling in Chord→Scale mode
+let lastDetectedRootPc = null;
+let lastDetectedSuffix = "";
+
 
 
 document.getElementById("btnPlus").addEventListener("click", () => {
@@ -162,6 +166,59 @@ function updateMemoryMeta() {
   }
 }
 
+function romanForPcInMajorKey(rootPc, keyPc) {
+  const d = normalizePc(rootPc - keyPc);
+  // Major scale degrees by semitone distance
+  const DEG = {
+    0: "I",
+    2: "II",
+    4: "III",
+    5: "IV",
+    7: "V",
+    9: "VI",
+    11: "VII",
+    // chromatic common spellings
+    1: "bII",
+    3: "bIII",
+    6: "bV",
+    8: "bVI",
+    10: "bVII"
+  };
+  return DEG[d] || "?";
+}
+
+function applyQualityToRoman(roman, suffix) {
+  const s = (suffix || "").toLowerCase();
+  let r = roman;
+
+  // Lowercase for minor-quality chords (avoid lowering maj7)
+  const isMinor = (s.startsWith("m") && !s.startsWith("maj")) || s.includes("m7") || s.includes("m6");
+  if (isMinor && r !== "?") r = r.toLowerCase();
+
+  // Diminished marker
+  if (s.includes("dim") || s.includes("m7b5")) {
+    if (r !== "?") r = r + "°";
+  }
+
+  // Augmented marker
+  if (s.includes("aug")) {
+    if (r !== "?") r = r + "+";
+  }
+
+  return r;
+}
+
+function formatChordDisplay(autoName) {
+  // Only add roman numerals in Chord→Scale mode
+  if (appMode !== "chordScale") return autoName;
+  if (lastDetectedRootPc === null) return autoName;
+
+  const baseRoman = romanForPcInMajorKey(lastDetectedRootPc, currentScalePc);
+  const roman = applyQualityToRoman(baseRoman, lastDetectedSuffix);
+  if (roman === "?") return autoName;
+  return roman + " — " + autoName;
+}
+
 function setChordName(name) {
   activeChordName = (name || "").trim();
   if (elChordNameText) {
@@ -184,6 +241,10 @@ function setMode(nextMode) {
   if (elMemoryCard) elMemoryCard.hidden = (appMode === "free");
   if (appMode === "free" && elMemoryModal && !elMemoryModal.hidden) {
     closeModal(elMemoryModal);
+  }
+  if (appMode === "free") {
+    activeSlot = -1;
+    setChordName("");
   }
 
   updateMemoryMeta();
@@ -261,7 +322,11 @@ function detectChordNameFromMidis(midis) {
   if (pcs.length === 0) return "";
 
   // Single note
-  if (pcs.length === 1) return NOTES_SHARP[pcs[0]];
+  if (pcs.length === 1) {
+    lastDetectedRootPc = pcs[0];
+    lastDetectedSuffix = "";
+    return NOTES_SHARP[pcs[0]];
+  }
 
   // Interval patterns (relative to root)
   // Higher score = prefer.
@@ -314,11 +379,16 @@ function detectChordNameFromMidis(midis) {
   // If nothing matched, fallback to pitch classes.
   if (!best) {
     const names = pcs.map((pc) => NOTES_SHARP[pc]);
+    // Unknown chord: still track root as bass
+    lastDetectedRootPc = bassPc;
+    lastDetectedSuffix = "";
     return names.join("-");
   }
 
   const rootName = NOTES_SHARP[best.root];
   let suffix = best.suffix;
+  lastDetectedRootPc = best.root;
+  lastDetectedSuffix = best.suffix;
 
   // Extensions: treat 9/11/13 as pitch classes 2/5/9 relative to root.
   // If a 7th is present, prefer 9/11/13 naming. Otherwise, use add9/add11/add13.
@@ -351,6 +421,8 @@ function detectChordNameFromMidis(midis) {
   // If there are still extra notes beyond our naming, add a light hint.
   // (We avoid listing every extension to keep it readable.)
   const baseName = rootName + suffix + slash;
+  // keep suffix updated if we appended extensions
+  lastDetectedSuffix = suffix;
   const expectedCount = 1 + (rel.has(3) || rel.has(4) ? 1 : 0) + (rel.has(6) || rel.has(7) || rel.has(8) ? 1 : 0);
   const extraHint = pcs.length > Math.max(3, expectedCount + 1) ? " (add)" : "";
 
@@ -374,7 +446,7 @@ function maybeAutoSetChordName() {
   }
 
   const auto = detectChordNameFromSelected();
-  if (auto) setChordName(auto);
+  if (auto) setChordName(formatChordDisplay(auto));
 }
 
 
