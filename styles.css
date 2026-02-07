@@ -40,6 +40,8 @@ body{
   gap: 10px;
 }
 
+.leftGroup{ display:flex; align-items:center; gap:10px; }
+
 .brand{ display:flex; align-items:center; gap:12px; min-width: 0; }
 .dot{
   width: 12px;
@@ -338,6 +340,7 @@ body{
 }
 
 .modalCard{
+  overscroll-behavior: contain;
   position: relative;
   width: min(560px, 100%);
   max-height: min(78dvh, 640px);
