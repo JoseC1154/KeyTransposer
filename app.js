@@ -21,6 +21,38 @@ const elTopbar = document.getElementById("topbar");
 const elControls = document.getElementById("controls");
 const elFooter = document.getElementById("footer");
 
+// ===== Chord Memory + Modes =====
+const elBtnMenu = document.getElementById("btnMenu");
+const elMenuModal = document.getElementById("menuModal");
+const elMemoryCard = document.getElementById("memoryCard");
+const elMemoryMeta = document.getElementById("memoryMeta");
+const elBtnMemory = document.getElementById("btnMemory");
+const elMemoryModal = document.getElementById("memoryModal");
+const elMemoryGrid = document.getElementById("memoryGrid");
+const elMemoryGridModal = document.getElementById("memoryGridModal");
+
+const elModeFree = document.getElementById("modeFree");
+const elModeChordScale = document.getElementById("modeChordScale");
+const elModeHint = document.getElementById("modeHint");
+const elBtnOpenMemory = document.getElementById("btnOpenMemory");
+const elBtnPickScale = document.getElementById("btnPickScale");
+
+const elScaleSelect = document.getElementById("scaleSelect");
+const elBtnScaleAdd = document.getElementById("btnScaleAdd");
+const elBtnScaleRemove = document.getElementById("btnScaleRemove");
+const elSlotHint = document.getElementById("slotHint");
+const elBtnSlotLoad = document.getElementById("btnSlotLoad");
+const elBtnSlotClear = document.getElementById("btnSlotClear");
+
+const STORAGE_KEY = "pct_state_v1";
+
+let appMode = "free"; // free | chordScale
+let scales = Array.from({ length: 12 }, (_, pc) => pc);
+let currentScalePc = 0; // C
+let memorySlots = Array.from({ length: 12 }, () => null); // { midis:number[], scalePc:number } | null
+let activeSlot = -1;
+
+
 document.getElementById("btnPlus").addEventListener("click", () => {
   if (octaves < MAX_OCTAVES) {
     octaves += 1;
@@ -46,6 +78,355 @@ document.getElementById("btnClear").addEventListener("click", () => {
   updateSelectionUI();
   updateHint();
 });
+
+// ===== Modal wiring =====
+function openModal(el) {
+  if (!el) return;
+  el.hidden = false;
+  const focusable = el.querySelector(
+    "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+  );
+  if (focusable) focusable.focus({ preventScroll: true });
+}
+
+function closeModal(el) {
+  if (!el) return;
+  el.hidden = true;
+}
+
+function closeFromTarget(t) {
+  if (!t || !t.getAttribute) return false;
+  const id = t.getAttribute("data-close");
+  if (!id) return false;
+  const el = document.getElementById(id);
+  if (el) closeModal(el);
+  return true;
+}
+
+document.addEventListener("pointerdown", (e) => {
+  if (closeFromTarget(e.target)) return;
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (elMemoryModal && !elMemoryModal.hidden) return closeModal(elMemoryModal);
+  if (elMenuModal && !elMenuModal.hidden) return closeModal(elMenuModal);
+});
+
+if (elBtnMenu) elBtnMenu.addEventListener("click", () => openModal(elMenuModal));
+if (elBtnMemory) {
+  elBtnMemory.addEventListener("click", () => {
+    syncMemoryModalGrid();
+    openModal(elMemoryModal);
+  });
+}
+if (elBtnOpenMemory) {
+  elBtnOpenMemory.addEventListener("click", () => {
+    closeModal(elMenuModal);
+    syncMemoryModalGrid();
+    openModal(elMemoryModal);
+  });
+}
+if (elBtnPickScale) {
+  elBtnPickScale.addEventListener("click", () => {
+    closeModal(elMenuModal);
+    syncMemoryModalGrid();
+    openModal(elMemoryModal);
+    if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
+  });
+}
+
+// ===== Modes =====
+function normalizePc(pc) {
+  return (pc % 12 + 12) % 12;
+}
+
+function updateMemoryMeta() {
+  if (!elMemoryMeta) return;
+  if (appMode === "free") {
+    elMemoryMeta.textContent = "Mode: Free";
+  } else {
+    elMemoryMeta.textContent = "Mode: Chord→Scale (" + NOTES_SHARP[currentScalePc] + ")";
+  }
+}
+
+function setMode(nextMode) {
+  appMode = nextMode;
+  if (elModeFree) elModeFree.classList.toggle("active", appMode === "free");
+  if (elModeChordScale) elModeChordScale.classList.toggle("active", appMode === "chordScale");
+  if (elModeHint) {
+    elModeHint.textContent =
+      appMode === "free"
+        ? "Free Transpose: select any notes and transpose by semitones."
+        : "Chord → Scale: store chords with a key. Slots update as you transpose.";
+  }
+  updateMemoryMeta();
+  saveState();
+  renderMemoryButtons();
+}
+
+if (elModeFree) elModeFree.addEventListener("click", () => setMode("free"));
+if (elModeChordScale) elModeChordScale.addEventListener("click", () => setMode("chordScale"));
+
+// ===== Scales =====
+function rebuildScaleSelect() {
+  if (!elScaleSelect) return;
+  elScaleSelect.innerHTML = "";
+  if (!Array.isArray(scales) || scales.length === 0) {
+    scales = Array.from({ length: 12 }, (_, pc) => pc);
+  }
+  for (const pc of scales) {
+    const opt = document.createElement("option");
+    opt.value = String(pc);
+    opt.textContent = NOTES_SHARP[pc];
+    elScaleSelect.appendChild(opt);
+  }
+  if (!scales.includes(currentScalePc)) currentScalePc = scales[0];
+  elScaleSelect.value = String(currentScalePc);
+}
+
+function setCurrentScalePc(pc) {
+  currentScalePc = normalizePc(pc);
+  updateMemoryMeta();
+  saveState();
+  renderMemoryButtons();
+}
+
+if (elScaleSelect) {
+  elScaleSelect.addEventListener("change", () => {
+    setCurrentScalePc(Number(elScaleSelect.value));
+  });
+}
+
+if (elBtnScaleAdd) {
+  elBtnScaleAdd.addEventListener("click", () => {
+    const raw = prompt(
+      "Add a key (e.g., C, F#, Bb). Use sharps (#) or flats (b):",
+      NOTES_SHARP[currentScalePc]
+    );
+    if (!raw) return;
+    const txt = raw.trim().toUpperCase().split(" ").join("");
+
+    const flatMap = { DB: "C#", EB: "D#", GB: "F#", AB: "G#", BB: "A#" };
+    const normalized = flatMap[txt] || txt;
+    const pc = NOTES_SHARP.indexOf(normalized);
+    if (pc < 0) return alert("Key not recognized. Try: C, C#, D, Eb, F#, Bb, etc.");
+
+    if (!scales.includes(pc)) scales.push(pc);
+    scales.sort((a, b) => a - b);
+    setCurrentScalePc(pc);
+    rebuildScaleSelect();
+    saveState();
+  });
+}
+
+if (elBtnScaleRemove) {
+  elBtnScaleRemove.addEventListener("click", () => {
+    const pc = currentScalePc;
+    scales = scales.filter((x) => x !== pc);
+    if (scales.length === 0) scales = Array.from({ length: 12 }, (_, p) => p);
+    currentScalePc = scales[0];
+    rebuildScaleSelect();
+    setCurrentScalePc(currentScalePc);
+    saveState();
+  });
+}
+
+// ===== Memory =====
+function chordLabelFromMidis(midis) {
+  const pcs = [...new Set(midis.map(midiToPitchClassName))];
+  return pcs.join("-");
+}
+
+function slotText(i) {
+  const slot = memorySlots[i];
+  if (!slot) return String(i + 1);
+  const keyName = NOTES_SHARP[normalizePc(slot.scalePc ?? 0)];
+  const chord = chordLabelFromMidis(slot.midis || []);
+  return keyName + "\n" + chord;
+}
+
+function renderMemoryButtons() {
+  if (!elMemoryGrid) return;
+  const btns = elMemoryGrid.querySelectorAll(".memBtn");
+  btns.forEach((btn) => {
+    const i = Number(btn.dataset.slot);
+    const slot = memorySlots[i];
+    btn.classList.toggle("filled", !!slot);
+    btn.classList.toggle("active", i === activeSlot && activeSlot !== -1);
+    btn.textContent = slot ? slotText(i) : String(i + 1);
+  });
+}
+
+function syncMemoryModalGrid() {
+  if (!elMemoryGridModal) return;
+
+  if (elMemoryGridModal.childElementCount !== 12) {
+    elMemoryGridModal.innerHTML = "";
+    for (let i = 0; i < 12; i++) {
+      const b = document.createElement("button");
+      b.className = "memBtn";
+      b.type = "button";
+      b.dataset.slot = String(i);
+      b.addEventListener("click", () => {
+        activeSlot = i;
+
+        if (selectedMidis.size === 0) {
+          if (elSlotHint) elSlotHint.textContent = "Select some keys first, then tap a slot to save.";
+          renderMemoryButtons();
+          syncMemoryModalGrid();
+          return;
+        }
+
+        const { min, max } = rangeMidis();
+        const midis = [...selectedMidis]
+          .map((m) => wrapIntoRange(m, min, max))
+          .sort((a, b) => a - b);
+
+        memorySlots[i] = { midis, scalePc: currentScalePc };
+
+        if (elSlotHint) elSlotHint.textContent = "Saved to slot " + (i + 1) + ".";
+        saveState();
+        renderMemoryButtons();
+        syncMemoryModalGrid();
+      });
+      elMemoryGridModal.appendChild(b);
+    }
+  }
+
+  const btns = elMemoryGridModal.querySelectorAll(".memBtn");
+  btns.forEach((btn) => {
+    const i = Number(btn.dataset.slot);
+    const slot = memorySlots[i];
+    btn.classList.toggle("filled", !!slot);
+    btn.classList.toggle("active", i === activeSlot && activeSlot !== -1);
+    btn.textContent = slot ? slotText(i) : String(i + 1);
+  });
+
+  rebuildScaleSelect();
+}
+
+function loadSlot(i) {
+  const slot = memorySlots[i];
+  if (!slot) return;
+  const { min, max } = rangeMidis();
+  selectedMidis = new Set((slot.midis || []).map((m) => wrapIntoRange(m, min, max)));
+  if (typeof slot.scalePc === "number") setCurrentScalePc(slot.scalePc);
+  updateSelectionUI();
+  updateHint();
+}
+
+function clearSlot(i) {
+  if (!memorySlots[i]) return;
+  memorySlots[i] = null;
+  saveState();
+  renderMemoryButtons();
+  syncMemoryModalGrid();
+}
+
+function transposeMemory(deltaSemitone) {
+  if (!Array.isArray(memorySlots)) return;
+  const { min, max } = rangeMidis();
+  let changed = false;
+
+  for (let i = 0; i < memorySlots.length; i++) {
+    const slot = memorySlots[i];
+    if (!slot || !Array.isArray(slot.midis)) continue;
+
+    slot.midis = slot.midis
+      .map((m) => wrapIntoRange(m + deltaSemitone, min, max))
+      .sort((a, b) => a - b);
+
+    if (typeof slot.scalePc === "number") slot.scalePc = normalizePc(slot.scalePc + deltaSemitone);
+    changed = true;
+  }
+
+  if (changed) {
+    saveState();
+    renderMemoryButtons();
+    syncMemoryModalGrid();
+  }
+}
+
+if (elMemoryGrid) {
+  elMemoryGrid.querySelectorAll(".memBtn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.slot);
+      activeSlot = i;
+
+      if (!memorySlots[i]) {
+        syncMemoryModalGrid();
+        openModal(elMemoryModal);
+        if (elSlotHint) {
+          elSlotHint.textContent =
+            "Slot " + (i + 1) + " is empty. Select keys, pick scale, then tap slot to save.";
+        }
+        renderMemoryButtons();
+        return;
+      }
+
+      loadSlot(i);
+      renderMemoryButtons();
+    });
+  });
+}
+
+if (elBtnSlotLoad) {
+  elBtnSlotLoad.addEventListener("click", () => {
+    if (activeSlot < 0) return;
+    loadSlot(activeSlot);
+    if (elSlotHint) elSlotHint.textContent = "Loaded slot " + (activeSlot + 1) + ".";
+  });
+}
+
+if (elBtnSlotClear) {
+  elBtnSlotClear.addEventListener("click", () => {
+    if (activeSlot < 0) return;
+    clearSlot(activeSlot);
+    if (elSlotHint) elSlotHint.textContent = "Cleared slot " + (activeSlot + 1) + ".";
+  });
+}
+
+// ===== Persistence =====
+function saveState() {
+  try {
+    const payload = { appMode, scales, currentScalePc, memorySlots };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (!p || typeof p !== "object") return;
+
+    if (p.appMode === "free" || p.appMode === "chordScale") appMode = p.appMode;
+
+    if (Array.isArray(p.scales) && p.scales.length) {
+      scales = p.scales.map((x) => normalizePc(Number(x))).filter((x) => Number.isFinite(x));
+    }
+
+    if (typeof p.currentScalePc === "number") currentScalePc = normalizePc(p.currentScalePc);
+
+    if (Array.isArray(p.memorySlots) && p.memorySlots.length === 12) {
+      memorySlots = p.memorySlots.map((s) => {
+        if (!s) return null;
+        const midis = Array.isArray(s.midis)
+          ? s.midis.map((m) => Number(m)).filter((m) => Number.isFinite(m))
+          : [];
+        const scalePc = typeof s.scalePc === "number" ? normalizePc(s.scalePc) : currentScalePc;
+        return { midis, scalePc };
+      });
+    }
+  } catch {
+    // ignore
+  }
+}
+
 
 function midiToPitchClass(midi) {
   return (midi % 12 + 12) % 12;
@@ -85,9 +466,14 @@ function transposeSelection(deltaSemitone) {
     next.add(wrapIntoRange(shifted, min, max));
   }
 
-  selectedMidis = next;
-  updateSelectionUI();
-  updateHint();
+selectedMidis = next;
+
+// Keep stored chords + their key in sync with transposition
+transposeMemory(deltaSemitone);
+
+updateSelectionUI();
+updateHint();
+
 }
 
 function updateHint() {
@@ -112,11 +498,22 @@ function rebuild() {
   const { min, max } = rangeMidis();
   selectedMidis = new Set([...selectedMidis].map((m) => wrapIntoRange(m, min, max)));
 
+  // Keep memory wrapped if range changes (octave +/-)
+  if (Array.isArray(memorySlots) && memorySlots.some(Boolean)) {
+    for (const slot of memorySlots) {
+      if (!slot || !Array.isArray(slot.midis)) continue;
+      slot.midis = slot.midis.map((m) => wrapIntoRange(m, min, max)).sort((a, b) => a - b);
+    }
+  }
+
   renderPiano();
   updateSelectionUI();
   updateHeader();
   updateHint();
+  renderMemoryButtons();
+  syncMemoryModalGrid();
 }
+
 
 function updateHeader() {
   const { min, max } = rangeMidis();
@@ -265,7 +662,14 @@ if ("serviceWorker" in navigator) {
 }
 
 // Init
+loadState();
+rebuildScaleSelect();
+setMode(appMode);
+renderMemoryButtons();
+syncMemoryModalGrid();
+
 applyResponsiveSizing();
 renderPiano();
 updateHeader();
 updateHint();
+
