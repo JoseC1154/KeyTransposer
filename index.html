@@ -23,6 +23,7 @@
         <div class="subtitle" id="rangeText">Range: —</div>
       </div>
     </div>
+    <button class="ghost" id="btnMenu" type="button" aria-haspopup="dialog" aria-controls="menuModal" aria-label="Menu">☰</button>
     <button class="ghost" id="btnClear" type="button">Clear</button>
   </header>
 
@@ -32,6 +33,28 @@
     <section class="pianoCard" aria-label="Piano">
       <div class="pianoScroll" id="pianoScroll">
         <div class="piano" id="piano" role="application" aria-label="Interactive piano"></div>
+      </div>
+    </section>
+    <!-- ===== CHORD MEMORY (12 slots) ===== -->
+    <section class="memoryCard" id="memoryCard" aria-label="Chord memory">
+      <div class="memoryHead">
+        <div class="memoryTitle">Chord Memory</div>
+        <div class="memoryMeta" id="memoryMeta">Mode: Free</div>
+        <button class="ghost" id="btnMemory" type="button" aria-haspopup="dialog" aria-controls="memoryModal">Manage</button>
+      </div>
+      <div class="memoryGrid" id="memoryGrid" role="group" aria-label="12 chord memory slots">
+        <button class="memBtn" type="button" data-slot="0" aria-label="Memory slot 1">1</button>
+        <button class="memBtn" type="button" data-slot="1" aria-label="Memory slot 2">2</button>
+        <button class="memBtn" type="button" data-slot="2" aria-label="Memory slot 3">3</button>
+        <button class="memBtn" type="button" data-slot="3" aria-label="Memory slot 4">4</button>
+        <button class="memBtn" type="button" data-slot="4" aria-label="Memory slot 5">5</button>
+        <button class="memBtn" type="button" data-slot="5" aria-label="Memory slot 6">6</button>
+        <button class="memBtn" type="button" data-slot="6" aria-label="Memory slot 7">7</button>
+        <button class="memBtn" type="button" data-slot="7" aria-label="Memory slot 8">8</button>
+        <button class="memBtn" type="button" data-slot="8" aria-label="Memory slot 9">9</button>
+        <button class="memBtn" type="button" data-slot="9" aria-label="Memory slot 10">10</button>
+        <button class="memBtn" type="button" data-slot="10" aria-label="Memory slot 11">11</button>
+        <button class="memBtn" type="button" data-slot="11" aria-label="Memory slot 12">12</button>
       </div>
     </section>
 
@@ -60,6 +83,73 @@
     </footer>
 
   </main>
+  <!-- ===== MENU MODAL ===== -->
+  <div class="modal" id="menuModal" hidden>
+    <div class="modalOverlay" data-close="menuModal"></div>
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+      <div class="modalHead">
+        <div class="modalTitle" id="menuTitle">Menu</div>
+        <button class="ghost" type="button" data-close="menuModal" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Mode</div>
+        <div class="modeRow" role="group" aria-label="App mode">
+          <button class="modeBtn" type="button" id="modeFree" data-mode="free">Free Transpose</button>
+          <button class="modeBtn" type="button" id="modeChordScale" data-mode="chordScale">Chord → Scale</button>
+        </div>
+        <div class="modalHint" id="modeHint">Free Transpose: select any notes and transpose by semitones.</div>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Scale</div>
+        <button class="ghost" type="button" id="btnPickScale">Pick / Manage Scales</button>
+        <div class="modalHint" id="scaleHint">Used for chord memory in Chord → Scale mode.</div>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Chord Memory</div>
+        <button class="ghost" type="button" id="btnOpenMemory">Open Memory Manager</button>
+        <div class="modalHint">Store up to 12 chords with their scale. Slots update when you transpose.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MEMORY MODAL ===== -->
+  <div class="modal" id="memoryModal" hidden>
+    <div class="modalOverlay" data-close="memoryModal"></div>
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="memoryTitle">
+      <div class="modalHead">
+        <div class="modalTitle" id="memoryTitle">Chord Memory</div>
+        <button class="ghost" type="button" data-close="memoryModal" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Save chord</div>
+        <div class="modalHint">Select notes on the keyboard, choose a scale, then tap a slot.</div>
+        <div class="memoryGrid" id="memoryGridModal" role="group" aria-label="Memory slots (modal)"></div>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Scale</div>
+        <div class="scalePickerRow">
+          <select id="scaleSelect" aria-label="Select scale"></select>
+          <button class="ghost" type="button" id="btnScaleAdd">Add</button>
+          <button class="ghost" type="button" id="btnScaleRemove">Remove</button>
+        </div>
+        <div class="modalHint" id="scaleListHint">Scales save locally on this device.</div>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Slot actions</div>
+        <div class="actionRow">
+          <button class="ghost" type="button" id="btnSlotLoad">Load</button>
+          <button class="ghost" type="button" id="btnSlotClear">Clear</button>
+        </div>
+        <div class="modalHint" id="slotHint">Load a chord to practice it, then transpose to move it through keys.</div>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
