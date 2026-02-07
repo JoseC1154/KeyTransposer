@@ -1,9 +1,9 @@
+<!-- FILE: index.html -->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#121212" />
   <title>Piano Chord Transposer</title>
 
@@ -17,6 +17,8 @@
 
   <!-- ===== TOP BAR ===== -->
   <header class="topbar" id="topbar">
+  <div class="leftGroup">
+    <button class="ghost" id="btnMenu" type="button" aria-haspopup="dialog" aria-controls="menuModal" aria-label="Menu">☰</button>
     <div class="brand">
       <span class="dot"></span>
       <div class="titles">
@@ -24,9 +26,9 @@
         <div class="subtitle" id="rangeText">Range: —</div>
       </div>
     </div>
-    <button class="ghost" id="btnMenu" type="button" aria-haspopup="dialog" aria-controls="menuModal" aria-label="Menu">☰</button>
-    <button class="ghost" id="btnClear" type="button">Clear</button>
-  </header>
+  </div>
+  <button class="ghost" id="btnClear" type="button">Clear</button>
+</header>
 
   <main class="wrap">
 
