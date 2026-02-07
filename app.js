@@ -85,6 +85,8 @@ document.getElementById("btnDown").addEventListener("click", () => transposeSele
 
 document.getElementById("btnClear").addEventListener("click", () => {
   selectedMidis.clear();
+  activeSlot = -1;
+  setChordName("");
   updateSelectionUI();
   updateHint();
 });
@@ -245,6 +247,136 @@ function chordLabelFromMidis(midis) {
   return pcs.join("-");
 }
 
+function detectChordNameFromMidis(midis) {
+  if (!midis || midis.length === 0) return "";
+
+  // Keep original order for bass detection, but compute pitch-class set for naming.
+  const orderedMidis = [...midis].filter((m) => Number.isFinite(m)).sort((a, b) => a - b);
+  if (orderedMidis.length === 0) return "";
+
+  const bassPc = midiToPitchClass(orderedMidis[0]);
+
+  // Unique pitch classes
+  const pcs = [...new Set(orderedMidis.map(midiToPitchClass))].sort((a, b) => a - b);
+  if (pcs.length === 0) return "";
+
+  // Single note
+  if (pcs.length === 1) return NOTES_SHARP[pcs[0]];
+
+  // Interval patterns (relative to root)
+  // Higher score = prefer.
+  const PATTERNS = [
+    { name: "maj7", ints: [0, 4, 7, 11], score: 90 },
+    { name: "7", ints: [0, 4, 7, 10], score: 88 },
+    { name: "m7", ints: [0, 3, 7, 10], score: 87 },
+    { name: "mMaj7", ints: [0, 3, 7, 11], score: 86 },
+    { name: "dim7", ints: [0, 3, 6, 9], score: 85 },
+    { name: "m7b5", ints: [0, 3, 6, 10], score: 84 },
+    { name: "6", ints: [0, 4, 7, 9], score: 82 },
+    { name: "m6", ints: [0, 3, 7, 9], score: 81 },
+
+    { name: "", ints: [0, 4, 7], score: 75 },        // major triad
+    { name: "m", ints: [0, 3, 7], score: 74 },       // minor triad
+    { name: "dim", ints: [0, 3, 6], score: 73 },     // diminished triad
+    { name: "aug", ints: [0, 4, 8], score: 72 },     // augmented triad
+    { name: "sus2", ints: [0, 2, 7], score: 71 },
+    { name: "sus4", ints: [0, 5, 7], score: 70 },
+
+    { name: "5", ints: [0, 7], score: 45 }           // power chord
+  ];
+
+  let best = null;
+
+  for (const root of pcs) {
+    const rel = new Set(pcs.map((p) => normalizePc(p - root)));
+
+    for (const pat of PATTERNS) {
+      // Require all needed intervals exist
+      let ok = true;
+      for (const i of pat.ints) {
+        if (!rel.has(i)) {
+          ok = false;
+          break;
+        }
+      }
+      if (!ok) continue;
+
+      // Penalize extra notes (unknown extensions)
+      const extras = pcs.length - pat.ints.length;
+      const score = pat.score - extras * 2;
+
+      if (!best || score > best.score) {
+        best = { root, suffix: pat.name, score, rel };
+      }
+    }
+  }
+
+  // If nothing matched, fallback to pitch classes.
+  if (!best) {
+    const names = pcs.map((pc) => NOTES_SHARP[pc]);
+    return names.join("-");
+  }
+
+  const rootName = NOTES_SHARP[best.root];
+  let suffix = best.suffix;
+
+  // Extensions: treat 9/11/13 as pitch classes 2/5/9 relative to root.
+  // If a 7th is present, prefer 9/11/13 naming. Otherwise, use add9/add11/add13.
+  const rel = best.rel;
+  const has7th = rel.has(10) || rel.has(11);
+
+  const has9 = rel.has(2);
+  const has11 = rel.has(5);
+  const has13 = rel.has(9);
+
+  // Choose highest extension present (common chord notation)
+  const highest = has13 ? 13 : has11 ? 11 : has9 ? 9 : 0;
+
+  // Some patterns already use 6/m6/dim7 etc; we still allow add9/add11/add13.
+  if (highest) {
+    if (has7th) {
+      // ex: Cmaj7 + D => Cmaj9 (we’ll keep maj7 suffix and append 9/11/13)
+      // Commonly: Cmaj9, C9, Cm11, C13
+      // If suffix is "" (triad) but has7th due to extra notes, it will still work.
+      suffix = suffix + String(highest);
+    } else {
+      suffix = suffix + "add" + String(highest);
+    }
+  }
+
+  // Slash chords / inversions
+  const needsSlash = bassPc !== best.root;
+  const slash = needsSlash ? ("/" + NOTES_SHARP[bassPc]) : "";
+
+  // If there are still extra notes beyond our naming, add a light hint.
+  // (We avoid listing every extension to keep it readable.)
+  const baseName = rootName + suffix + slash;
+  const expectedCount = 1 + (rel.has(3) || rel.has(4) ? 1 : 0) + (rel.has(6) || rel.has(7) || rel.has(8) ? 1 : 0);
+  const extraHint = pcs.length > Math.max(3, expectedCount + 1) ? " (add)" : "";
+
+  return baseName + extraHint;
+}
+
+function detectChordNameFromSelected() {
+  return detectChordNameFromMidis([...selectedMidis]);
+}
+
+function maybeAutoSetChordName() {
+  // Don't overwrite a loaded slot name in chordScale mode
+  if (appMode === "chordScale" && activeSlot >= 0) {
+    const slot = getSlot(currentScalePc, activeSlot);
+    if (slot && slot.name) return;
+  }
+
+  if (selectedMidis.size === 0) {
+    if (!activeChordName) setChordName("");
+    return;
+  }
+
+  const auto = detectChordNameFromSelected();
+  if (auto) setChordName(auto);
+}
+
 
 function getSlot(bankPc, slotIndex) {
   return bankChords?.[bankPc]?.[slotIndex] || null;
@@ -283,8 +415,9 @@ function syncMemoryModalGrid() {
           return;
         }
 
-        const defaultName = activeChordName || "";
-        const name = prompt("Name this chord (e.g., I, IV, V7, sus2):", defaultName);
+        const autoName = detectChordNameFromSelected();
+        const defaultName = (activeChordName || autoName || "").trim();
+        const name = prompt("Name this chord (auto-filled, edit if you want):", defaultName);
         if (name === null) return;
 
         const { min, max } = rangeMidis();
@@ -292,8 +425,9 @@ function syncMemoryModalGrid() {
           .map((m) => wrapIntoRange(m, min, max))
           .sort((a, b) => a - b);
 
-        bankChords[currentScalePc][i] = { midis, name: (name || "").trim() };
-        setChordName((name || "").trim());
+        const finalName = (name || "").trim() || autoName || "";
+        bankChords[currentScalePc][i] = { midis, name: finalName };
+        setChordName(finalName);
 
         if (elSlotHint) {
           elSlotHint.textContent =
@@ -489,34 +623,42 @@ function transposeSelection(deltaSemitone) {
   const next = new Set();
 
   for (const m of selectedMidis) {
-    const shifted = m + deltaSemitone; // ✅ true semitone
+    const shifted = m + deltaSemitone; // true semitone
     next.add(wrapIntoRange(shifted, min, max));
   }
 
-selectedMidis = next;
+  selectedMidis = next;
 
-// In Chord→Scale mode, transposing also advances the scale bank and transposes all stored chords.
-transposeBanksAndChords(deltaSemitone);
+  // In Chord→Scale mode, transposing also advances the scale bank and transposes all stored chords.
+  transposeBanksAndChords(deltaSemitone);
 
-updateSelectionUI();
-updateHint();
-
+  updateSelectionUI();
+  updateHint();
 }
+
 
 function updateHint() {
   if (selectedMidis.size === 0) {
-    elTransposeHint.textContent = "Select keys";
+    if (elTransposeHint) elTransposeHint.textContent = "Select keys";
+    maybeAutoSetChordName();
     return;
   }
   const ordered = [...selectedMidis].sort((a, b) => a - b);
   const pcs = ordered.map(midiToPitchClassName);
   const uniq = [...new Set(pcs)];
-  elTransposeHint.textContent = uniq.join(" - ");
+  if (elTransposeHint) elTransposeHint.textContent = uniq.join(" - ");
+
+  // Auto-label (unless a loaded slot name should stay)
+  maybeAutoSetChordName();
 }
 
 function handleKeyToggle(midi) {
+  // Manual selection breaks the association with a loaded slot
+  activeSlot = -1;
+
   if (selectedMidis.has(midi)) selectedMidis.delete(midi);
   else selectedMidis.add(midi);
+
   updateSelectionUI();
   updateHint();
 }
@@ -548,8 +690,8 @@ function rebuild() {
 
 function updateHeader() {
   const { min, max } = rangeMidis();
-  elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)}`;
-  elOctaveText.textContent = `${octaves}`;
+  if (elRangeText) elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)}`;
+  if (elOctaveText) elOctaveText.textContent = `${octaves}`;
 }
 
 function applyResponsiveSizing() {
