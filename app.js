@@ -232,6 +232,13 @@ function setCurrentScalePc(pc) {
   syncMemoryModalGrid();
 }
 
+// Change scale bank when dropdown changes
+if (elScaleSelect) {
+  elScaleSelect.addEventListener("change", () => {
+    setCurrentScalePc(Number(elScaleSelect.value));
+  });
+}
+
 // ===== Memory =====
 function chordLabelFromMidis(midis) {
   const pcs = [...new Set(midis.map(midiToPitchClassName))];
