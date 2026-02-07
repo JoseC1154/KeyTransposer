@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v2";
+const CACHE_NAME = "piano-transposer-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,8 +6,8 @@ const ASSETS = [
   "./app.js",
   "./manifest.json",
   "./service-worker.js",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  // NOTE: icons are intentionally NOT pre-cached.
+  // If the icons folder/files don't exist yet on GitHub Pages, precaching will fail.
 ];
 
 self.addEventListener("install", (event) => {
