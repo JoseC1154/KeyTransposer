@@ -1,3 +1,4 @@
+// FILE: app.js
 const NOTES_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const IS_BLACK = new Set([1,3,6,8,10]); // C#, D#, F#, G#, A#
 
@@ -160,6 +161,13 @@ function setMode(nextMode) {
         ? "Free Transpose: select any notes and transpose by semitones."
         : "Chord → Scale: store chords with a key. Slots update as you transpose.";
   }
+
+  // Hide memory UI in Free mode
+  if (elMemoryCard) elMemoryCard.hidden = (appMode === "free");
+  if (appMode === "free" && elMemoryModal && !elMemoryModal.hidden) {
+    closeModal(elMemoryModal);
+  }
+
   updateMemoryMeta();
   saveState();
   renderMemoryButtons();
