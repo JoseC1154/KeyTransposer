@@ -14,6 +14,7 @@ let selectedMidis = new Set();
 const elPiano = document.getElementById("piano");
 const elPianoScroll = document.getElementById("pianoScroll");
 const elRangeText = document.getElementById("rangeText");
+const elChordNameText = document.getElementById("chordNameText");
 const elOctaveText = document.getElementById("octaveText");
 const elStatus = document.getElementById("status");
 const elTransposeHint = document.getElementById("transposeHint");
@@ -48,10 +49,18 @@ const elBtnSlotClear = document.getElementById("btnSlotClear");
 const STORAGE_KEY = "pct_state_v1";
 
 let appMode = "free"; // free | chordScale
+
+// Fixed 12 scale banks (C..B)
 let scales = Array.from({ length: 12 }, (_, pc) => pc);
-let currentScalePc = 0; // C
-let memorySlots = Array.from({ length: 12 }, () => null); // { midis:number[], scalePc:number } | null
+let currentScalePc = 0; // bank index 0..11
+
+// 12 scale banks × 12 chord slots
+// bankChords[bankPc][slotIndex] = { midis:number[], name:string } | null
+let bankChords = Array.from({ length: 12 }, () => Array.from({ length: 12 }, () => null));
+
 let activeSlot = -1;
+let activeChordName = "";
+
 
 
 document.getElementById("btnPlus").addEventListener("click", () => {
@@ -151,6 +160,13 @@ function updateMemoryMeta() {
   }
 }
 
+function setChordName(name) {
+  activeChordName = (name || "").trim();
+  if (elChordNameText) {
+    elChordNameText.textContent = activeChordName ? ("Chord: " + activeChordName) : "Chord: —";
+  }
+}
+
 function setMode(nextMode) {
   appMode = nextMode;
   if (elModeFree) elModeFree.classList.toggle("active", appMode === "free");
@@ -180,64 +196,40 @@ if (elModeChordScale) elModeChordScale.addEventListener("click", () => setMode("
 function rebuildScaleSelect() {
   if (!elScaleSelect) return;
   elScaleSelect.innerHTML = "";
-  if (!Array.isArray(scales) || scales.length === 0) {
-    scales = Array.from({ length: 12 }, (_, pc) => pc);
-  }
+
+  // Fixed 12 scale banks (no adding/removing)
+  scales = Array.from({ length: 12 }, (_, pc) => pc);
+
   for (const pc of scales) {
     const opt = document.createElement("option");
     opt.value = String(pc);
     opt.textContent = NOTES_SHARP[pc];
     elScaleSelect.appendChild(opt);
   }
-  if (!scales.includes(currentScalePc)) currentScalePc = scales[0];
+
   elScaleSelect.value = String(currentScalePc);
+
+  // Disable scale add/remove controls if present
+  if (elBtnScaleAdd) {
+    elBtnScaleAdd.disabled = true;
+    elBtnScaleAdd.hidden = true;
+  }
+  if (elBtnScaleRemove) {
+    elBtnScaleRemove.disabled = true;
+    elBtnScaleRemove.hidden = true;
+  }
 }
+
 
 function setCurrentScalePc(pc) {
   currentScalePc = normalizePc(pc);
+  if (elScaleSelect) elScaleSelect.value = String(currentScalePc);
+  activeSlot = -1;
+  setChordName("");
   updateMemoryMeta();
   saveState();
   renderMemoryButtons();
-}
-
-if (elScaleSelect) {
-  elScaleSelect.addEventListener("change", () => {
-    setCurrentScalePc(Number(elScaleSelect.value));
-  });
-}
-
-if (elBtnScaleAdd) {
-  elBtnScaleAdd.addEventListener("click", () => {
-    const raw = prompt(
-      "Add a key (e.g., C, F#, Bb). Use sharps (#) or flats (b):",
-      NOTES_SHARP[currentScalePc]
-    );
-    if (!raw) return;
-    const txt = raw.trim().toUpperCase().split(" ").join("");
-
-    const flatMap = { DB: "C#", EB: "D#", GB: "F#", AB: "G#", BB: "A#" };
-    const normalized = flatMap[txt] || txt;
-    const pc = NOTES_SHARP.indexOf(normalized);
-    if (pc < 0) return alert("Key not recognized. Try: C, C#, D, Eb, F#, Bb, etc.");
-
-    if (!scales.includes(pc)) scales.push(pc);
-    scales.sort((a, b) => a - b);
-    setCurrentScalePc(pc);
-    rebuildScaleSelect();
-    saveState();
-  });
-}
-
-if (elBtnScaleRemove) {
-  elBtnScaleRemove.addEventListener("click", () => {
-    const pc = currentScalePc;
-    scales = scales.filter((x) => x !== pc);
-    if (scales.length === 0) scales = Array.from({ length: 12 }, (_, p) => p);
-    currentScalePc = scales[0];
-    rebuildScaleSelect();
-    setCurrentScalePc(currentScalePc);
-    saveState();
-  });
+  syncMemoryModalGrid();
 }
 
 // ===== Memory =====
@@ -246,12 +238,9 @@ function chordLabelFromMidis(midis) {
   return pcs.join("-");
 }
 
-function slotText(i) {
-  const slot = memorySlots[i];
-  if (!slot) return String(i + 1);
-  const keyName = NOTES_SHARP[normalizePc(slot.scalePc ?? 0)];
-  const chord = chordLabelFromMidis(slot.midis || []);
-  return keyName + "\n" + chord;
+
+function getSlot(bankPc, slotIndex) {
+  return bankChords?.[bankPc]?.[slotIndex] || null;
 }
 
 function renderMemoryButtons() {
@@ -259,12 +248,13 @@ function renderMemoryButtons() {
   const btns = elMemoryGrid.querySelectorAll(".memBtn");
   btns.forEach((btn) => {
     const i = Number(btn.dataset.slot);
-    const slot = memorySlots[i];
+    const slot = getSlot(currentScalePc, i);
     btn.classList.toggle("filled", !!slot);
     btn.classList.toggle("active", i === activeSlot && activeSlot !== -1);
-    btn.textContent = slot ? slotText(i) : String(i + 1);
+    btn.textContent = String(i + 1); // always numbered
   });
 }
+
 
 function syncMemoryModalGrid() {
   if (!elMemoryGridModal) return;
@@ -286,14 +276,22 @@ function syncMemoryModalGrid() {
           return;
         }
 
+        const defaultName = activeChordName || "";
+        const name = prompt("Name this chord (e.g., I, IV, V7, sus2):", defaultName);
+        if (name === null) return;
+
         const { min, max } = rangeMidis();
         const midis = [...selectedMidis]
           .map((m) => wrapIntoRange(m, min, max))
           .sort((a, b) => a - b);
 
-        memorySlots[i] = { midis, scalePc: currentScalePc };
+        bankChords[currentScalePc][i] = { midis, name: (name || "").trim() };
+        setChordName((name || "").trim());
 
-        if (elSlotHint) elSlotHint.textContent = "Saved to slot " + (i + 1) + ".";
+        if (elSlotHint) {
+          elSlotHint.textContent =
+            "Saved slot " + (i + 1) + " for " + NOTES_SHARP[currentScalePc] + ".";
+        }
         saveState();
         renderMemoryButtons();
         syncMemoryModalGrid();
@@ -305,55 +303,66 @@ function syncMemoryModalGrid() {
   const btns = elMemoryGridModal.querySelectorAll(".memBtn");
   btns.forEach((btn) => {
     const i = Number(btn.dataset.slot);
-    const slot = memorySlots[i];
+    const slot = getSlot(currentScalePc, i);
     btn.classList.toggle("filled", !!slot);
     btn.classList.toggle("active", i === activeSlot && activeSlot !== -1);
-    btn.textContent = slot ? slotText(i) : String(i + 1);
+    btn.textContent = String(i + 1);
   });
 
   rebuildScaleSelect();
 }
 
+
 function loadSlot(i) {
-  const slot = memorySlots[i];
+  const slot = getSlot(currentScalePc, i);
   if (!slot) return;
+
   const { min, max } = rangeMidis();
   selectedMidis = new Set((slot.midis || []).map((m) => wrapIntoRange(m, min, max)));
-  if (typeof slot.scalePc === "number") setCurrentScalePc(slot.scalePc);
+
+  setChordName(slot.name || "");
   updateSelectionUI();
   updateHint();
 }
 
+
 function clearSlot(i) {
-  if (!memorySlots[i]) return;
-  memorySlots[i] = null;
+  if (!getSlot(currentScalePc, i)) return;
+  bankChords[currentScalePc][i] = null;
+
+  if (activeSlot === i) {
+    activeSlot = -1;
+    setChordName("");
+  }
+
   saveState();
   renderMemoryButtons();
   syncMemoryModalGrid();
 }
 
-function transposeMemory(deltaSemitone) {
-  if (!Array.isArray(memorySlots)) return;
+
+function transposeBanksAndChords(deltaSemitone) {
+  if (appMode !== "chordScale") return;
+
   const { min, max } = rangeMidis();
-  let changed = false;
 
-  for (let i = 0; i < memorySlots.length; i++) {
-    const slot = memorySlots[i];
-    if (!slot || !Array.isArray(slot.midis)) continue;
-
-    slot.midis = slot.midis
-      .map((m) => wrapIntoRange(m + deltaSemitone, min, max))
-      .sort((a, b) => a - b);
-
-    if (typeof slot.scalePc === "number") slot.scalePc = normalizePc(slot.scalePc + deltaSemitone);
-    changed = true;
+  // Rotate banks and transpose all stored chords by the same semitone amount
+  const nextBanks = Array.from({ length: 12 }, () => Array.from({ length: 12 }, () => null));
+  for (let bank = 0; bank < 12; bank++) {
+    const toBank = normalizePc(bank + deltaSemitone);
+    for (let i = 0; i < 12; i++) {
+      const slot = bankChords[bank][i];
+      if (!slot) continue;
+      const midis = (slot.midis || [])
+        .map((m) => wrapIntoRange(m + deltaSemitone, min, max))
+        .sort((a, b) => a - b);
+      nextBanks[toBank][i] = { midis, name: slot.name || "" };
+    }
   }
+  bankChords = nextBanks;
 
-  if (changed) {
-    saveState();
-    renderMemoryButtons();
-    syncMemoryModalGrid();
-  }
+  // Advance current bank
+  setCurrentScalePc(currentScalePc + deltaSemitone);
 }
 
 if (elMemoryGrid) {
@@ -362,12 +371,13 @@ if (elMemoryGrid) {
       const i = Number(btn.dataset.slot);
       activeSlot = i;
 
-      if (!memorySlots[i]) {
+      const slot = getSlot(currentScalePc, i);
+      if (!slot) {
         syncMemoryModalGrid();
         openModal(elMemoryModal);
         if (elSlotHint) {
           elSlotHint.textContent =
-            "Slot " + (i + 1) + " is empty. Select keys, pick scale, then tap slot to save.";
+            "Slot " + (i + 1) + " is empty. Select keys, name the chord, then tap slot to save.";
         }
         renderMemoryButtons();
         return;
@@ -398,7 +408,7 @@ if (elBtnSlotClear) {
 // ===== Persistence =====
 function saveState() {
   try {
-    const payload = { appMode, scales, currentScalePc, memorySlots };
+    const payload = { appMode, currentScalePc, bankChords };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // ignore
@@ -413,22 +423,24 @@ function loadState() {
     if (!p || typeof p !== "object") return;
 
     if (p.appMode === "free" || p.appMode === "chordScale") appMode = p.appMode;
-
-    if (Array.isArray(p.scales) && p.scales.length) {
-      scales = p.scales.map((x) => normalizePc(Number(x))).filter((x) => Number.isFinite(x));
-    }
-
     if (typeof p.currentScalePc === "number") currentScalePc = normalizePc(p.currentScalePc);
 
-    if (Array.isArray(p.memorySlots) && p.memorySlots.length === 12) {
-      memorySlots = p.memorySlots.map((s) => {
-        if (!s) return null;
-        const midis = Array.isArray(s.midis)
-          ? s.midis.map((m) => Number(m)).filter((m) => Number.isFinite(m))
-          : [];
-        const scalePc = typeof s.scalePc === "number" ? normalizePc(s.scalePc) : currentScalePc;
-        return { midis, scalePc };
-      });
+    if (Array.isArray(p.bankChords) && p.bankChords.length === 12) {
+      const next = Array.from({ length: 12 }, () => Array.from({ length: 12 }, () => null));
+      for (let bank = 0; bank < 12; bank++) {
+        const row = p.bankChords[bank];
+        if (!Array.isArray(row) || row.length !== 12) continue;
+        for (let i = 0; i < 12; i++) {
+          const s = row[i];
+          if (!s) continue;
+          const midis = Array.isArray(s.midis)
+            ? s.midis.map((m) => Number(m)).filter((m) => Number.isFinite(m))
+            : [];
+          const name = typeof s.name === "string" ? s.name : "";
+          next[bank][i] = { midis, name };
+        }
+      }
+      bankChords = next;
     }
   } catch {
     // ignore
@@ -476,8 +488,8 @@ function transposeSelection(deltaSemitone) {
 
 selectedMidis = next;
 
-// Keep stored chords + their key in sync with transposition
-transposeMemory(deltaSemitone);
+// In Chord→Scale mode, transposing also advances the scale bank and transposes all stored chords.
+transposeBanksAndChords(deltaSemitone);
 
 updateSelectionUI();
 updateHint();
@@ -506,11 +518,14 @@ function rebuild() {
   const { min, max } = rangeMidis();
   selectedMidis = new Set([...selectedMidis].map((m) => wrapIntoRange(m, min, max)));
 
-  // Keep memory wrapped if range changes (octave +/-)
-  if (Array.isArray(memorySlots) && memorySlots.some(Boolean)) {
-    for (const slot of memorySlots) {
-      if (!slot || !Array.isArray(slot.midis)) continue;
-      slot.midis = slot.midis.map((m) => wrapIntoRange(m, min, max)).sort((a, b) => a - b);
+  // Keep stored chords wrapped if range changes (octave +/-)
+  if (Array.isArray(bankChords) && bankChords.length === 12) {
+    for (let bank = 0; bank < 12; bank++) {
+      for (let i = 0; i < 12; i++) {
+        const slot = bankChords[bank][i];
+        if (!slot || !Array.isArray(slot.midis)) continue;
+        slot.midis = slot.midis.map((m) => wrapIntoRange(m, min, max)).sort((a, b) => a - b);
+      }
     }
   }
 
@@ -521,6 +536,7 @@ function rebuild() {
   renderMemoryButtons();
   syncMemoryModalGrid();
 }
+
 
 
 function updateHeader() {
@@ -673,8 +689,10 @@ if ("serviceWorker" in navigator) {
 loadState();
 rebuildScaleSelect();
 setMode(appMode);
+setCurrentScalePc(currentScalePc);
 renderMemoryButtons();
 syncMemoryModalGrid();
+setChordName("");
 
 applyResponsiveSizing();
 renderPiano();
