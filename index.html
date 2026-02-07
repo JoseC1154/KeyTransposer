@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="theme-color" content="#121212" />
   <title>Piano Chord Transposer</title>
 
@@ -24,7 +24,6 @@
       <span class="dot"></span>
       <div class="titles">
         <div class="appname">Piano Chord Transposer</div>
-        $1
         <div class="subtitle" id="chordNameText">Chord: —</div>
       </div>
     </div>
@@ -45,6 +44,11 @@
       <div class="memoryHead">
         <div class="memoryTitle">Chord Memory</div>
         <div class="memoryMeta" id="memoryMeta">Mode: Free</div>
+        <div class="bankSelector" id="bankSelector">
+          <button class="bankBtn" id="btnBankPrev" type="button" aria-label="Previous scale">◀</button>
+          <button class="bankBtn bankCurrent" id="btnBankCurrent" type="button" aria-label="Current scale">C</button>
+          <button class="bankBtn" id="btnBankNext" type="button" aria-label="Next scale">▶</button>
+        </div>
         <button class="ghost" id="btnMemory" type="button" aria-haspopup="dialog" aria-controls="memoryModal">Manage</button>
       </div>
       <div class="memoryGrid" id="memoryGrid" role="group" aria-label="12 chord memory slots">
@@ -81,6 +85,7 @@
 
       <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
       <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
+      <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
     </section>
 
     <footer class="footer" id="footer">
@@ -152,6 +157,39 @@
           <button class="ghost" type="button" id="btnSlotClear">Clear</button>
         </div>
         <div class="modalHint" id="slotHint">Load a chord to practice it, then transpose to move it through keys.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CUSTOM PROMPT MODAL ===== -->
+  <div class="modal" id="promptModal" hidden>
+    <div class="modalOverlay" data-close="promptModal"></div>
+    <div class="modalCard promptCard" role="dialog" aria-modal="true" aria-labelledby="promptTitle">
+      <div class="modalHead">
+        <div class="modalTitle" id="promptTitle">Name this chord</div>
+        <button class="ghost" type="button" data-close="promptModal" aria-label="Close">✕</button>
+      </div>
+      <div class="modalSection">
+        <input type="text" id="promptInput" class="promptInput" placeholder="Enter chord name" />
+      </div>
+      <div class="modalSection promptActions">
+        <button class="ghost" type="button" data-close="promptModal">Cancel</button>
+        <button class="ghost accent" type="button" id="promptOk">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ALTERNATE CHORDS MODAL ===== -->
+  <div class="modal" id="alternatesModal" hidden>
+    <div class="modalOverlay" data-close="alternatesModal"></div>
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="alternatesTitle">
+      <div class="modalHead">
+        <div class="modalTitle" id="alternatesTitle">Alternate Chord Suggestions</div>
+        <button class="ghost" type="button" data-close="alternatesModal" aria-label="Close">✕</button>
+      </div>
+      <div class="modalSection">
+        <div class="modalHint" id="alternatesHint">Similar chords and voicings you can try:</div>
+        <div id="alternatesList" class="alternatesList"></div>
       </div>
     </div>
   </div>

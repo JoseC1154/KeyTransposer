@@ -2,11 +2,15 @@
 const NOTES_SHARP = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const IS_BLACK = new Set([1,3,6,8,10]); // C#, D#, F#, G#, A#
 
-// Start on a real C so labeling is correct: C3 = MIDI 48
-let startMidi = 48; // C3
+// Full 88-key piano: A0 (21) to C8 (108)
+const PIANO_START_MIDI = 21; // A0
+const PIANO_END_MIDI = 109; // C8 (exclusive)
+const TOTAL_KEYS = 88;
+
+// Octaves controls viewport/visible area sizing
 let octaves = 2;
 
-const MIN_OCTAVES = 2; // ✅ minimum 2 octaves
+const MIN_OCTAVES = 2;
 const MAX_OCTAVES = 7;
 
 let selectedMidis = new Set();
@@ -46,6 +50,17 @@ const elSlotHint = document.getElementById("slotHint");
 const elBtnSlotLoad = document.getElementById("btnSlotLoad");
 const elBtnSlotClear = document.getElementById("btnSlotClear");
 
+// ===== Bank Selector =====
+const elBankSelector = document.getElementById("bankSelector");
+const elBtnBankPrev = document.getElementById("btnBankPrev");
+const elBtnBankCurrent = document.getElementById("btnBankCurrent");
+const elBtnBankNext = document.getElementById("btnBankNext");
+
+// ===== Alternates =====
+const elBtnAlternates = document.getElementById("btnAlternates");
+const elAlternatesModal = document.getElementById("alternatesModal");
+const elAlternatesList = document.getElementById("alternatesList");
+
 const STORAGE_KEY = "pct_state_v1";
 
 let appMode = "free"; // free | chordScale
@@ -59,6 +74,7 @@ let currentScalePc = 0; // bank index 0..11
 let bankChords = Array.from({ length: 12 }, () => Array.from({ length: 12 }, () => null));
 
 let activeSlot = -1;
+let activeBankPc = -1; // Track which bank the active slot belongs to
 let activeChordName = "";
 
 // Last detected chord root (pitch class) for roman-numeral labeling in Chord→Scale mode
@@ -90,10 +106,65 @@ document.getElementById("btnDown").addEventListener("click", () => transposeSele
 document.getElementById("btnClear").addEventListener("click", () => {
   selectedMidis.clear();
   activeSlot = -1;
+  activeBankPc = -1;
   setChordName("");
   updateSelectionUI();
   updateHint();
 });
+
+// ===== Custom Prompt Modal =====
+const elPromptModal = document.getElementById("promptModal");
+const elPromptInput = document.getElementById("promptInput");
+const elPromptOk = document.getElementById("promptOk");
+
+function customPrompt(message, defaultValue = "") {
+  return new Promise((resolve) => {
+    const promptTitle = document.getElementById("promptTitle");
+    if (promptTitle) promptTitle.textContent = message;
+    if (elPromptInput) elPromptInput.value = defaultValue;
+    
+    openModal(elPromptModal);
+    
+    // Focus and select the input
+    if (elPromptInput) {
+      setTimeout(() => {
+        elPromptInput.focus();
+        elPromptInput.select();
+      }, 100);
+    }
+
+    const handleOk = () => {
+      const value = elPromptInput ? elPromptInput.value : "";
+      closeModal(elPromptModal);
+      cleanup();
+      resolve(value);
+    };
+
+    const handleCancel = () => {
+      closeModal(elPromptModal);
+      cleanup();
+      resolve(null);
+    };
+
+    const handleKeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleOk();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleCancel();
+      }
+    };
+
+    const cleanup = () => {
+      if (elPromptOk) elPromptOk.removeEventListener("click", handleOk);
+      if (elPromptInput) elPromptInput.removeEventListener("keydown", handleKeydown);
+    };
+
+    if (elPromptOk) elPromptOk.addEventListener("click", handleOk);
+    if (elPromptInput) elPromptInput.addEventListener("keydown", handleKeydown);
+  });
+}
 
 // ===== Modal wiring =====
 function openModal(el) {
@@ -125,6 +196,8 @@ document.addEventListener("pointerdown", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  if (elPromptModal && !elPromptModal.hidden) return; // Let customPrompt handle it
+  if (elAlternatesModal && !elAlternatesModal.hidden) return closeModal(elAlternatesModal);
   if (elMemoryModal && !elMemoryModal.hidden) return closeModal(elMemoryModal);
   if (elMenuModal && !elMenuModal.hidden) return closeModal(elMenuModal);
 });
@@ -146,6 +219,42 @@ if (elBtnOpenMemory) {
 if (elBtnPickScale) {
   elBtnPickScale.addEventListener("click", () => {
     closeModal(elMenuModal);
+    syncMemoryModalGrid();
+    openModal(elMemoryModal);
+    if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
+  });
+}
+
+// ===== Bank Selector Event Handlers =====
+function updateBankDisplay() {
+  if (elBtnBankCurrent) {
+    elBtnBankCurrent.textContent = NOTES_SHARP[currentScalePc];
+  }
+  updateMemoryMeta();
+  renderMemoryButtons();
+  syncMemoryModalGrid();
+}
+
+function changeBank(direction) {
+  currentScalePc = normalizePc(currentScalePc + direction);
+  activeSlot = -1;
+  activeBankPc = -1;
+  setChordName("");
+  updateBankDisplay();
+  saveState();
+}
+
+if (elBtnBankPrev) {
+  elBtnBankPrev.addEventListener("click", () => changeBank(-1));
+}
+
+if (elBtnBankNext) {
+  elBtnBankNext.addEventListener("click", () => changeBank(1));
+}
+
+if (elBtnBankCurrent) {
+  elBtnBankCurrent.addEventListener("click", () => {
+    // Show a quick picker for all 12 scales
     syncMemoryModalGrid();
     openModal(elMemoryModal);
     if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
@@ -239,15 +348,18 @@ function setMode(nextMode) {
 
   // Hide memory UI in Free mode
   if (elMemoryCard) elMemoryCard.hidden = (appMode === "free");
+  if (elBankSelector) elBankSelector.style.display = (appMode === "chordScale" ? "flex" : "none");
   if (appMode === "free" && elMemoryModal && !elMemoryModal.hidden) {
     closeModal(elMemoryModal);
   }
   if (appMode === "free") {
     activeSlot = -1;
+    activeBankPc = -1;
     setChordName("");
   }
 
   updateMemoryMeta();
+  updateBankDisplay();
   saveState();
   renderMemoryButtons();
 }
@@ -288,6 +400,7 @@ function setCurrentScalePc(pc) {
   currentScalePc = normalizePc(pc);
   if (elScaleSelect) elScaleSelect.value = String(currentScalePc);
   activeSlot = -1;
+  activeBankPc = -1;
   setChordName("");
   updateMemoryMeta();
   saveState();
@@ -433,6 +546,186 @@ function detectChordNameFromSelected() {
   return detectChordNameFromMidis([...selectedMidis]);
 }
 
+// ===== Alternate Chord Suggestions =====
+function generateAlternateChords() {
+  if (selectedMidis.size === 0) return [];
+
+  const orderedMidis = [...selectedMidis].sort((a, b) => a - b);
+  const pcs = [...new Set(orderedMidis.map(midiToPitchClass))].sort((a, b) => a - b);
+  
+  if (pcs.length < 2) return [];
+
+  const bassMidi = orderedMidis[0];
+  const { min, max } = rangeMidis();
+  
+  const alternates = [];
+
+  // Helper to create chord from intervals
+  const makeChord = (root, intervals, name, description) => {
+    const midis = intervals.map(i => {
+      let midi = root + i;
+      // Keep within current range
+      while (midi < min) midi += 12;
+      while (midi > max) midi -= 12;
+      return midi;
+    }).sort((a, b) => a - b);
+    
+    return { midis, name, description };
+  };
+
+  const rootPc = lastDetectedRootPc !== null ? lastDetectedRootPc : pcs[0];
+  const rootMidi = bassMidi;
+  const rootName = NOTES_SHARP[rootPc];
+
+  // Current chord type detection
+  const hasThird = pcs.some(pc => normalizePc(pc - rootPc) === 3 || normalizePc(pc - rootPc) === 4);
+  const isMajor = pcs.some(pc => normalizePc(pc - rootPc) === 4);
+  const isMinor = pcs.some(pc => normalizePc(pc - rootPc) === 3);
+  const hasSeventh = pcs.some(pc => [10, 11].includes(normalizePc(pc - rootPc)));
+
+  // Suggest inversions
+  if (pcs.length >= 3) {
+    // First inversion (3rd in bass)
+    const thirdInterval = isMajor ? 4 : isMinor ? 3 : 4;
+    alternates.push(makeChord(
+      rootMidi,
+      [thirdInterval, 7, 12],
+      `${rootName}${isMinor ? 'm' : ''}/1st inv`,
+      "First inversion (3rd in bass)"
+    ));
+
+    // Second inversion (5th in bass)
+    alternates.push(makeChord(
+      rootMidi,
+      [7, 12, 12 + thirdInterval],
+      `${rootName}${isMinor ? 'm' : ''}/2nd inv`,
+      "Second inversion (5th in bass)"
+    ));
+  }
+
+  // Suggest related chords
+  if (isMajor && !hasSeventh) {
+    // Add 7th variations
+    alternates.push(makeChord(rootMidi, [0, 4, 7, 11], `${rootName}maj7`, "Add major 7th"));
+    alternates.push(makeChord(rootMidi, [0, 4, 7, 10], `${rootName}7`, "Add dominant 7th"));
+    alternates.push(makeChord(rootMidi, [0, 4, 7, 9], `${rootName}6`, "Add major 6th"));
+  }
+
+  if (isMinor && !hasSeventh) {
+    // Minor 7th variations
+    alternates.push(makeChord(rootMidi, [0, 3, 7, 10], `${rootName}m7`, "Add minor 7th"));
+    alternates.push(makeChord(rootMidi, [0, 3, 7, 11], `${rootName}mMaj7`, "Add major 7th"));
+    alternates.push(makeChord(rootMidi, [0, 3, 7, 9], `${rootName}m6`, "Add major 6th"));
+  }
+
+  // Suggest sus chords
+  if (hasThird) {
+    alternates.push(makeChord(rootMidi, [0, 5, 7], `${rootName}sus4`, "Suspended 4th"));
+    alternates.push(makeChord(rootMidi, [0, 2, 7], `${rootName}sus2`, "Suspended 2nd"));
+  }
+
+  // Suggest extensions
+  if (hasSeventh) {
+    const seventhInterval = pcs.some(pc => normalizePc(pc - rootPc) === 11) ? 11 : 10;
+    const thirdInterval = isMajor ? 4 : 3;
+    
+    alternates.push(makeChord(
+      rootMidi,
+      [0, thirdInterval, 7, seventhInterval, 14],
+      `${rootName}${isMinor ? 'm' : ''}9`,
+      "Add 9th extension"
+    ));
+    
+    alternates.push(makeChord(
+      rootMidi,
+      [0, thirdInterval, 7, seventhInterval, 14, 17],
+      `${rootName}${isMinor ? 'm' : ''}11`,
+      "Add 11th extension"
+    ));
+  }
+
+  // Relative major/minor
+  if (isMajor) {
+    const relativeMidiRoot = rootMidi - 3;
+    alternates.push(makeChord(
+      relativeMidiRoot,
+      [0, 3, 7],
+      `${NOTES_SHARP[normalizePc(rootPc - 3)]}m`,
+      "Relative minor"
+    ));
+  } else if (isMinor) {
+    const relativeMidiRoot = rootMidi + 3;
+    alternates.push(makeChord(
+      relativeMidiRoot,
+      [0, 4, 7],
+      `${NOTES_SHARP[normalizePc(rootPc + 3)]}`,
+      "Relative major"
+    ));
+  }
+
+  return alternates;
+}
+
+function showAlternateChords() {
+  if (selectedMidis.size === 0) {
+    if (elAlternatesList) {
+      elAlternatesList.innerHTML = '<div class="modalHint">Select some keys first to see alternate chord suggestions.</div>';
+    }
+    openModal(elAlternatesModal);
+    return;
+  }
+
+  const alternates = generateAlternateChords();
+  
+  if (!elAlternatesList) return;
+  elAlternatesList.innerHTML = "";
+
+  if (alternates.length === 0) {
+    elAlternatesList.innerHTML = '<div class="modalHint">No alternate suggestions available for this selection.</div>';
+  } else {
+    alternates.forEach((alt, idx) => {
+      const item = document.createElement("div");
+      item.className = "alternateItem";
+      
+      const info = document.createElement("div");
+      const nameDiv = document.createElement("div");
+      nameDiv.className = "alternateChordName";
+      nameDiv.textContent = alt.name;
+      
+      const descDiv = document.createElement("div");
+      descDiv.className = "alternateChordDesc";
+      descDiv.textContent = alt.description;
+      
+      info.appendChild(nameDiv);
+      info.appendChild(descDiv);
+      
+      const btn = document.createElement("button");
+      btn.className = "alternateBtn";
+      btn.textContent = "Apply";
+      btn.type = "button";
+      btn.addEventListener("click", () => {
+        selectedMidis.clear();
+        alt.midis.forEach(m => selectedMidis.add(m));
+        setChordName(alt.name);
+        updateSelectionUI();
+        updateHint();
+        closeModal(elAlternatesModal);
+      });
+      
+      item.appendChild(info);
+      item.appendChild(btn);
+      elAlternatesList.appendChild(item);
+    });
+  }
+
+  openModal(elAlternatesModal);
+}
+
+if (elBtnAlternates) {
+  elBtnAlternates.addEventListener("click", showAlternateChords);
+}
+
+
 function maybeAutoSetChordName() {
   // Don't overwrite a loaded slot name in chordScale mode
   if (appMode === "chordScale" && activeSlot >= 0) {
@@ -461,7 +754,7 @@ function renderMemoryButtons() {
     const i = Number(btn.dataset.slot);
     const slot = getSlot(currentScalePc, i);
     btn.classList.toggle("filled", !!slot);
-    btn.classList.toggle("active", i === activeSlot && activeSlot !== -1);
+    btn.classList.toggle("active", i === activeSlot && activeBankPc === currentScalePc && activeSlot !== -1);
     btn.textContent = String(i + 1); // always numbered
   });
 }
@@ -477,8 +770,9 @@ function syncMemoryModalGrid() {
       b.className = "memBtn";
       b.type = "button";
       b.dataset.slot = String(i);
-      b.addEventListener("click", () => {
+      b.addEventListener("click", async () => {
         activeSlot = i;
+        activeBankPc = currentScalePc;
 
         if (selectedMidis.size === 0) {
           if (elSlotHint) elSlotHint.textContent = "Select some keys first, then tap a slot to save.";
@@ -489,7 +783,7 @@ function syncMemoryModalGrid() {
 
         const autoName = detectChordNameFromSelected();
         const defaultName = (activeChordName || autoName || "").trim();
-        const name = prompt("Name this chord (auto-filled, edit if you want):", defaultName);
+        const name = await customPrompt("Name this chord (auto-filled, edit if you want):", defaultName);
         if (name === null) return;
 
         const { min, max } = rangeMidis();
@@ -508,6 +802,7 @@ function syncMemoryModalGrid() {
         saveState();
         renderMemoryButtons();
         syncMemoryModalGrid();
+        closeModal(elMemoryModal);
       });
       elMemoryGridModal.appendChild(b);
     }
@@ -543,8 +838,9 @@ function clearSlot(i) {
   if (!getSlot(currentScalePc, i)) return;
   bankChords[currentScalePc][i] = null;
 
-  if (activeSlot === i) {
+  if (activeSlot === i && activeBankPc === currentScalePc) {
     activeSlot = -1;
+    activeBankPc = -1;
     setChordName("");
   }
 
@@ -583,6 +879,7 @@ if (elMemoryGrid) {
     btn.addEventListener("click", () => {
       const i = Number(btn.dataset.slot);
       activeSlot = i;
+      activeBankPc = currentScalePc;
 
       const slot = getSlot(currentScalePc, i);
       if (!slot) {
@@ -676,8 +973,8 @@ function midiToNote(midi) {
 }
 
 function rangeMidis() {
-  const endExclusive = startMidi + (octaves * 12);
-  return { min: startMidi, max: endExclusive - 1, endExclusive };
+  // Always return full 88-key range
+  return { min: PIANO_START_MIDI, max: PIANO_END_MIDI - 1, endExclusive: PIANO_END_MIDI };
 }
 
 function wrapIntoRange(midi, min, max) {
@@ -727,6 +1024,7 @@ function updateHint() {
 function handleKeyToggle(midi) {
   // Manual selection breaks the association with a loaded slot
   activeSlot = -1;
+  activeBankPc = -1;
 
   if (selectedMidis.has(midi)) selectedMidis.delete(midi);
   else selectedMidis.add(midi);
@@ -762,19 +1060,17 @@ function rebuild() {
 
 function updateHeader() {
   const { min, max } = rangeMidis();
-  if (elRangeText) elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)}`;
+  if (elRangeText) elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)} (88 keys)`;
   if (elOctaveText) elOctaveText.textContent = `${octaves}`;
 }
 
 function applyResponsiveSizing() {
-  // Requirements:
-  // - No horizontal scroll: ALL keys always visible.
-  // - No vertical scroll on mobile: controls always reachable.
   // Strategy:
-  // - Fit white key widths into container width
-  // - Compute proportional height, capped to remaining viewport height
+  // - Keys are sized based on the viewport octave count for comfortable viewing
+  // - All 88 keys are always rendered and can be scrolled through
+  // - Viewport shows the selected number of octaves at a comfortable size
 
-  const whiteCount = octaves * 7; // 7 white keys per octave
+  const viewportWhiteCount = octaves * 7; // 7 white keys per octave
   const rs = getComputedStyle(document.documentElement);
   const gap = parseFloat(rs.getPropertyValue("--gap")) || 2;
 
@@ -782,8 +1078,8 @@ function applyResponsiveSizing() {
   const paddingAllowance = 20; // .piano padding L+R (10 + 10)
   const availableW = Math.max(240, containerW - paddingAllowance);
 
-  const totalGap = (whiteCount - 1) * gap;
-  const whiteW = Math.max(16, (availableW - totalGap) / whiteCount);
+  const totalGap = (viewportWhiteCount - 1) * gap;
+  const whiteW = Math.max(16, (availableW - totalGap) / viewportWhiteCount);
 
   // Remaining height budget after topbar + controlBar + footer
   const topH = elTopbar ? elTopbar.offsetHeight : 0;
@@ -792,26 +1088,41 @@ function applyResponsiveSizing() {
   const safe = 28; // wrap padding + gaps buffer
   const availableH = Math.max(160, window.innerHeight - topH - controlsH - footerH - safe);
 
-  // Original visual ratio (~520 / 46)
-  const baseRatio = 520 / 46;
+  // Set top padding to match header height + buffer to prevent overlap
+  const elWrap = document.querySelector(".wrap");
+  if (topH > 0 && elWrap) {
+    const buffer = 20; // Extra spacing for clearance
+    elWrap.style.paddingTop = `${topH + buffer}px`;
+  }
+
+  // More realistic piano key ratio (6:1 instead of 11:1)
+  const baseRatio = 6;
   const whiteH = Math.max(140, Math.min(availableH, whiteW * baseRatio));
+
+  // Calculate responsive border radius (capped between 3px and 10px)
+  const whiteBorderRadius = Math.max(3, Math.min(10, whiteW * 0.15));
+  const blackBorderRadius = Math.max(2, Math.min(8, whiteW * 0.12));
 
   document.documentElement.style.setProperty("--white-w", `${whiteW.toFixed(3)}px`);
   document.documentElement.style.setProperty("--white-h", `${whiteH.toFixed(3)}px`);
   document.documentElement.style.setProperty("--black-w", `${(whiteW * 0.65).toFixed(3)}px`);
   document.documentElement.style.setProperty("--black-h", `${(whiteH * 0.62).toFixed(3)}px`);
+  document.documentElement.style.setProperty("--key-radius", `${whiteBorderRadius.toFixed(2)}px`);
+  document.documentElement.style.setProperty("--black-radius", `${blackBorderRadius.toFixed(2)}px`);
 }
+
+// Track scroll vs tap for touch devices
+let pointerDownPos = { x: 0, y: 0 };
+let isScrolling = false;
 
 function renderPiano() {
   elPiano.innerHTML = "";
 
-  const { endExclusive } = rangeMidis();
-
-  // Build keys while tracking white positions
+  // Always render all 88 keys
   const keys = [];
   let whiteIndex = 0;
 
-  for (let midi = startMidi; midi < endExclusive; midi++) {
+  for (let midi = PIANO_START_MIDI; midi < PIANO_END_MIDI; midi++) {
     const pc = midiToPitchClass(midi);
     const isBlack = IS_BLACK.has(pc);
 
@@ -840,7 +1151,14 @@ function renderPiano() {
 
     div.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      handleKeyToggle(k.midi);
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      isScrolling = false;
+    });
+
+    div.addEventListener("pointerup", (e) => {
+      if (!isScrolling) {
+        handleKeyToggle(k.midi);
+      }
     });
 
     whiteRow.appendChild(div);
@@ -867,15 +1185,45 @@ function renderPiano() {
 
     div.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      handleKeyToggle(k.midi);
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+      isScrolling = false;
     });
 
-    // anchor white left + white width + half gap - half black width + piano padding
-    const leftPx = (k.anchorWhiteIndex * (whiteW + gap)) + whiteW + (gap / 2) - (blackW / 2) + 10;
+    div.addEventListener("pointerup", (e) => {
+      if (!isScrolling) {
+        handleKeyToggle(k.midi);
+      }
+    });
+
+    // Position black key between the anchor white and the next white
+    // Black key is centered at the right edge of the anchor white key
+    const leftPx = (k.anchorWhiteIndex * (whiteW + gap)) + whiteW - (blackW / 2) + 10;
     div.style.left = `${leftPx}px`;
 
     elPiano.appendChild(div);
   }
+}
+
+// Detect scrolling on piano container
+if (elPianoScroll) {
+  elPianoScroll.addEventListener("pointermove", (e) => {
+    if (pointerDownPos.x !== 0 || pointerDownPos.y !== 0) {
+      const deltaX = Math.abs(e.clientX - pointerDownPos.x);
+      const deltaY = Math.abs(e.clientY - pointerDownPos.y);
+      // If moved more than 5px, consider it scrolling
+      if (deltaX > 5 || deltaY > 5) {
+        isScrolling = true;
+      }
+    }
+  });
+
+  elPianoScroll.addEventListener("pointerup", () => {
+    pointerDownPos = { x: 0, y: 0 };
+  });
+
+  elPianoScroll.addEventListener("pointercancel", () => {
+    pointerDownPos = { x: 0, y: 0 };
+  });
 }
 
 function updateSelectionUI() {
@@ -911,6 +1259,7 @@ loadState();
 rebuildScaleSelect();
 setMode(appMode);
 setCurrentScalePc(currentScalePc);
+updateBankDisplay();
 renderMemoryButtons();
 syncMemoryModalGrid();
 setChordName("");
