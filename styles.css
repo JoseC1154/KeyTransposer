@@ -352,7 +352,7 @@ body::before{
 /* ===== Single-line Controls ===== */
 .controlBar{
   display: grid;
-  grid-template-columns: 56px 56px 1fr 56px 56px;
+  grid-template-columns: 56px 56px 1fr 56px 56px 56px;
   gap: 10px;
   align-items: center;
   background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
@@ -428,7 +428,7 @@ body::before{
   .wrap{ padding: 8px 10px 12px; gap: 8px; }
 
   .controlBar{
-    grid-template-columns: 52px 52px 1fr 52px 52px;
+    grid-template-columns: 52px 52px 1fr 52px 52px 52px;
     gap: 8px;
     padding: 8px;
   }
