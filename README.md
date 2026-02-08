@@ -41,4 +41,6 @@ To Do
 - need a share button export / import
 - the alternate chord button should be on the same line with transpose buttons. 
 - the note letters are not in front of circle they are infront of.
-- in landscape the module should move arourd or close to the size of a button that unfolds or leads to modal for space. 
+- in landscape the module should move arourd or close to the size of a button that unfolds or leads to modal for space.
+- in menu both scale and chordd memory buttons lead to the same modal.
+- 
