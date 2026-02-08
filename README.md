@@ -33,3 +33,10 @@ All requested improvements have been implemented:
 - Alternate chord suggestions with one-tap application
 - Offline-capable PWA
 - Mobile-optimized with proper safe area handling
+
+To Do
+
+- after alternate chord suggestions a eay to get back to previous chord.
+- when in chord Memory the transpose button should transpose the selected chord starting point the scale memory bank scale. (if i use the following chords in F# major going down 1 step on the transpose button should say F major scale. )
+- need a share button export / import
+-
