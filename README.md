@@ -39,4 +39,6 @@ To Do
 - after alternate chord suggestions a eay to get back to previous chord.
 - when in chord Memory the transpose button should transpose the selected chord starting point the scale memory bank scale. (if i use the following chords in F# major going down 1 step on the transpose button should say F major scale. )
 - need a share button export / import
--
+- the alternate chord button should be on the same line with transpose buttons. 
+- the note letters are not in front of circle they are infront of.
+- in landscape the module should move arourd or close to the size of a button that unfolds or leads to modal for space. 
