@@ -156,6 +156,7 @@ http://localhost:8000
 * Fix note letter positioning so the letters sit correctly centered on the key circles.
 * Landscape: reduce modal footprint (button-sized launcher or more compact modal layout).
 * Menu: “Scale” and “Chord Memory” currently route to the same modal — separate these into the correct destinations.
+* Fix logic, check the reasoning for alterante chord "I created an f# maj chord , saved it then used the alternative button and what it sugested was a Db Maj,"
 
 ---
 
