@@ -60,6 +60,16 @@ const elBtnBankNext = document.getElementById("btnBankNext");
 const elBtnAlternates = document.getElementById("btnAlternates");
 const elAlternatesModal = document.getElementById("alternatesModal");
 const elAlternatesList = document.getElementById("alternatesList");
+const elBtnUndo = document.getElementById("btnUndo");
+
+// ===== Help =====
+const elBtnHelp = document.getElementById("btnHelp");
+const elHelpModal = document.getElementById("helpModal");
+
+// ===== Export / Import =====
+const elBtnExport = document.getElementById("btnExport");
+const elBtnImport = document.getElementById("btnImport");
+const elFileInput = document.getElementById("fileInput");
 
 const STORAGE_KEY = "pct_state_v1";
 
@@ -80,6 +90,10 @@ let activeChordName = "";
 // Last detected chord root (pitch class) for roman-numeral labeling in Chord→Scale mode
 let lastDetectedRootPc = null;
 let lastDetectedSuffix = "";
+
+// Undo history stack for alternate chord changes (max 5 steps)
+const MAX_UNDO_STEPS = 5;
+let undoHistory = []; // Array of { midis: Set<number>, name: string }
 
 
 
@@ -108,9 +122,42 @@ document.getElementById("btnClear").addEventListener("click", () => {
   activeSlot = -1;
   activeBankPc = -1;
   setChordName("");
+  undoHistory = [];
+  updateUndoButton();
   updateSelectionUI();
   updateHint();
 });
+
+// ===== Undo Alternate Chord =====
+function updateUndoButton() {
+  if (elBtnUndo) {
+    elBtnUndo.hidden = undoHistory.length === 0;
+    // Update button text to show number of undo steps available
+    if (undoHistory.length > 1) {
+      elBtnUndo.textContent = `↶${undoHistory.length}`;
+    } else {
+      elBtnUndo.textContent = "↶";
+    }
+  }
+}
+
+function undoAlternateChord() {
+  if (undoHistory.length === 0) return;
+  
+  const previousState = undoHistory.pop();
+  
+  selectedMidis.clear();
+  previousState.midis.forEach(m => selectedMidis.add(m));
+  setChordName(previousState.name);
+  
+  updateUndoButton();
+  updateSelectionUI();
+  updateHint();
+}
+
+if (elBtnUndo) {
+  elBtnUndo.addEventListener("click", undoAlternateChord);
+}
 
 // ===== Custom Prompt Modal =====
 const elPromptModal = document.getElementById("promptModal");
@@ -222,6 +269,152 @@ if (elBtnPickScale) {
     syncMemoryModalGrid();
     openModal(elMemoryModal);
     if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
+  });
+}
+if (elBtnHelp) {
+  elBtnHelp.addEventListener("click", () => {
+    closeModal(elMenuModal);
+    openModal(elHelpModal);
+  });
+}
+
+// ===== Export / Import Chord Banks =====
+function exportChordBanks() {
+  const exportData = {
+    version: "1.0",
+    timestamp: new Date().toISOString(),
+    appMode,
+    currentScalePc,
+    bankChords: bankChords.map(bank => 
+      bank.map(slot => 
+        slot ? { midis: [...slot.midis], name: slot.name } : null
+      )
+    )
+  };
+
+  const dataStr = JSON.stringify(exportData, null, 2);
+  const dataBlob = new Blob([dataStr], { type: "application/json" });
+  const url = URL.createObjectURL(dataBlob);
+  
+  const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+  const filename = `piano-chords-${timestamp}.json`;
+  
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  
+  URL.revokeObjectURL(url);
+  
+  if (elStatus) {
+    elStatus.textContent = `Exported: ${filename}`;
+    setTimeout(() => {
+      elStatus.textContent = "Offline-ready.";
+    }, 3000);
+  }
+}
+
+function importChordBanks(fileContent) {
+  try {
+    const data = JSON.parse(fileContent);
+    
+    // Validate structure
+    if (!data.bankChords || !Array.isArray(data.bankChords) || data.bankChords.length !== 12) {
+      throw new Error("Invalid backup file structure");
+    }
+    
+    // Validate each bank
+    for (let bankIdx = 0; bankIdx < 12; bankIdx++) {
+      const bank = data.bankChords[bankIdx];
+      if (!Array.isArray(bank) || bank.length !== 12) {
+        throw new Error(`Invalid bank ${bankIdx} structure`);
+      }
+      
+      // Validate each slot
+      for (let slotIdx = 0; slotIdx < 12; slotIdx++) {
+        const slot = bank[slotIdx];
+        if (slot !== null) {
+          if (!slot.midis || !Array.isArray(slot.midis) || typeof slot.name !== "string") {
+            throw new Error(`Invalid slot data at bank ${bankIdx}, slot ${slotIdx}`);
+          }
+        }
+      }
+    }
+    
+    // Import data
+    bankChords = data.bankChords.map(bank =>
+      bank.map(slot =>
+        slot ? { midis: slot.midis, name: slot.name } : null
+      )
+    );
+    
+    if (typeof data.appMode === "string" && ["free", "chordScale"].includes(data.appMode)) {
+      setMode(data.appMode);
+    }
+    
+    if (typeof data.currentScalePc === "number" && data.currentScalePc >= 0 && data.currentScalePc < 12) {
+      currentScalePc = data.currentScalePc;
+      updateBankDisplay();
+    }
+    
+    saveState();
+    renderMemoryButtons();
+    syncMemoryModalGrid();
+    
+    if (elStatus) {
+      elStatus.textContent = "Chord banks imported successfully!";
+      setTimeout(() => {
+        elStatus.textContent = "Offline-ready.";
+      }, 3000);
+    }
+    
+    return true;
+  } catch (err) {
+    console.error("Import error:", err);
+    if (elStatus) {
+      elStatus.textContent = `Import failed: ${err.message}`;
+      setTimeout(() => {
+        elStatus.textContent = "Offline-ready.";
+      }, 4000);
+    }
+    return false;
+  }
+}
+
+if (elBtnExport) {
+  elBtnExport.addEventListener("click", () => {
+    exportChordBanks();
+  });
+}
+
+if (elBtnImport && elFileInput) {
+  elBtnImport.addEventListener("click", () => {
+    elFileInput.click();
+  });
+  
+  elFileInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result;
+      if (typeof content === "string") {
+        importChordBanks(content);
+      }
+      // Reset input so same file can be imported again
+      elFileInput.value = "";
+    };
+    reader.onerror = () => {
+      if (elStatus) {
+        elStatus.textContent = "Failed to read file";
+        setTimeout(() => {
+          elStatus.textContent = "Offline-ready.";
+        }, 3000);
+      }
+      elFileInput.value = "";
+    };
+    reader.readAsText(file);
   });
 }
 
@@ -704,6 +897,19 @@ function showAlternateChords() {
       btn.textContent = "Apply";
       btn.type = "button";
       btn.addEventListener("click", () => {
+        // Save current state to undo history
+        undoHistory.push({
+          midis: new Set(selectedMidis),
+          name: activeChordName
+        });
+        
+        // Keep only last MAX_UNDO_STEPS entries
+        if (undoHistory.length > MAX_UNDO_STEPS) {
+          undoHistory.shift();
+        }
+        
+        updateUndoButton();
+        
         selectedMidis.clear();
         alt.midis.forEach(m => selectedMidis.add(m));
         setChordName(alt.name);
@@ -1025,6 +1231,10 @@ function handleKeyToggle(midi) {
   // Manual selection breaks the association with a loaded slot
   activeSlot = -1;
   activeBankPc = -1;
+  
+  // Clear undo history on manual selection
+  undoHistory = [];
+  updateUndoButton();
 
   if (selectedMidis.has(midi)) selectedMidis.delete(midi);
   else selectedMidis.add(midi);

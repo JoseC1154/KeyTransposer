@@ -352,7 +352,7 @@ body::before{
 /* ===== Single-line Controls ===== */
 .controlBar{
   display: grid;
-  grid-template-columns: 56px 56px 1fr 56px 56px;
+  grid-template-columns: 56px 56px 1fr 56px 56px 56px 56px;
   gap: 10px;
   align-items: center;
   background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
@@ -428,7 +428,7 @@ body::before{
   .wrap{ padding: 8px 10px 12px; gap: 8px; }
 
   .controlBar{
-    grid-template-columns: 52px 52px 1fr 52px 52px;
+    grid-template-columns: 52px 52px 1fr 52px 52px 52px 52px;
     gap: 8px;
     padding: 8px;
   }
@@ -441,6 +441,71 @@ body::before{
   .piano{ padding: 8px 8px 10px; }
 }
 
+/* ===== Landscape Layout Optimizations ===== */
+@media (orientation: landscape) and (max-height: 600px) {
+  .topbar{
+    padding: 6px 12px;
+    min-height: 48px;
+  }
+  
+  .brand{
+    gap: 8px;
+  }
+  
+  .appname{
+    font-size: 14px;
+  }
+  
+  .subtitle{
+    font-size: 11px;
+  }
+  
+  .ctrl{
+    height: 46px;
+  }
+  
+  .ctrl.mini{
+    height: 42px;
+  }
+  
+  .controlBar{
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  .hud{
+    padding: 4px 8px;
+  }
+  
+  .hudLabel{
+    font-size: 11px;
+  }
+  
+  .hudValue{
+    font-size: 12px;
+  }
+  
+  .memoryCard{
+    padding: 8px;
+  }
+  
+  .memoryHead{
+    gap: 8px;
+    padding: 4px 0;
+  }
+  
+  .memoryTitle{
+    font-size: 13px;
+  }
+  
+  .memoryMeta{
+    font-size: 11px;
+  }
+  
+  .footer{
+    font-size: 11px;
+  }
+}
 
 
 /* ===== Modals (focus-first) ===== */
@@ -553,6 +618,10 @@ select{
   gap: 10px;
 }
 
+.hiddenFileInput{
+  display: none;
+}
+
 @media (max-width: 520px){
   .modalCard{ width: 100%; max-height: 82dvh; }
   .modeRow{ grid-template-columns: 1fr; }
@@ -662,4 +731,142 @@ select{
 .alternateBtn:hover{
   background: rgba(29,185,84,0.15);
   border-color: rgba(29,185,84,0.35);
+}
+
+/* ===== Help Modal ===== */
+.helpCard{
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.helpSectionTitle{
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.helpText{
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255,255,255,0.85);
+}
+
+.helpText strong{
+  color: var(--text);
+  font-weight: 700;
+}
+
+@media (max-width: 520px){
+  .helpCard{
+    max-height: 80vh;
+  }
+  
+  .helpSectionTitle{
+    font-size: 15px;
+  }
+  
+  .helpText{
+    font-size: 13px;
+  }
+}
+
+/* ===== Landscape Optimizations ===== */
+@media (orientation: landscape) and (max-height: 600px) {
+  .modal{
+    padding: 8px;
+  }
+  
+  .modalCard{
+    width: min(680px, 95%);
+    max-height: 85vh;
+    padding: 8px;
+    border-radius: 16px;
+  }
+  
+  .modalSection{
+    padding: 8px;
+    margin: 6px 0;
+    border-radius: 12px;
+  }
+  
+  .modalHead{
+    padding: 4px 4px 6px;
+  }
+  
+  .modalTitle{
+    font-size: 15px;
+  }
+  
+  .modalLabel{
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+  
+  .modalHint{
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  
+  .modeBtn{
+    height: 40px;
+    font-size: 13px;
+  }
+  
+  .ghost{
+    height: 40px;
+    font-size: 13px;
+  }
+  
+  .helpCard{
+    max-height: 82vh;
+  }
+  
+  .helpSectionTitle{
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  
+  .helpText{
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  
+  .promptCard{
+    width: min(380px, 90%);
+  }
+  
+  .promptInput{
+    height: 40px;
+    font-size: 14px;
+  }
+  
+  .alternateItem{
+    padding: 8px;
+  }
+  
+  .alternateChordName{
+    font-size: 14px;
+  }
+  
+  .alternateChordDesc{
+    font-size: 11px;
+  }
+  
+  .alternateBtn{
+    height: 32px;
+    padding: 0 12px;
+    font-size: 12px;
+  }
+  
+  /* Make memory grid more compact in landscape */
+  .memoryGrid{
+    gap: 6px;
+  }
+  
+  .memBtn{
+    height: 38px;
+    font-size: 12px;
+  }
 }

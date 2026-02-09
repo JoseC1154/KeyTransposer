@@ -86,6 +86,7 @@
       <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
       <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
       <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
+      <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
     </section>
 
     <footer class="footer" id="footer">
@@ -121,6 +122,22 @@
         <div class="modalLabel">Chord Memory</div>
         <button class="ghost" type="button" id="btnOpenMemory">Open Memory Manager</button>
         <div class="modalHint">Store up to 12 chords with their scale. Slots update when you transpose.</div>
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Backup & Share</div>
+        <div class="actionRow">
+          <button class="ghost" type="button" id="btnExport">Export Data</button>
+          <button class="ghost" type="button" id="btnImport">Import Data</button>
+        </div>
+        <div class="modalHint">Backup your chord banks to a file or restore from a previous backup.</div>
+        <input type="file" id="fileInput" accept=".json" class="hiddenFileInput" />
+      </div>
+
+      <div class="modalSection">
+        <div class="modalLabel">Help</div>
+        <button class="ghost" type="button" id="btnHelp">How to Use This App</button>
+        <div class="modalHint">Learn about controls and features.</div>
       </div>
     </div>
   </div>
@@ -190,6 +207,91 @@
       <div class="modalSection">
         <div class="modalHint" id="alternatesHint">Similar chords and voicings you can try:</div>
         <div id="alternatesList" class="alternatesList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== HELP MODAL ===== -->
+  <div class="modal" id="helpModal" hidden>
+    <div class="modalOverlay" data-close="helpModal"></div>
+    <div class="modalCard helpCard" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <div class="modalHead">
+        <div class="modalTitle" id="helpTitle">How to Use Piano Chord Transposer</div>
+        <button class="ghost" type="button" data-close="helpModal" aria-label="Close">✕</button>
+      </div>
+      
+      <div class="modalSection">
+        <div class="helpSectionTitle">🎹 Piano Keyboard</div>
+        <div class="helpText">
+          <strong>Tap keys</strong> to select notes. Selected keys light up in green.
+          <br>Use <strong>− / +</strong> buttons to change the number of visible octaves.
+        </div>
+      </div>
+
+      <div class="modalSection">
+        <div class="helpSectionTitle">🎵 Transposing</div>
+        <div class="helpText">
+          Select notes, then use <strong>▲</strong> (up) or <strong>▼</strong> (down) to transpose by semitone.
+          <br>Your selected notes move together while staying in the keyboard range.
+        </div>
+      </div>
+
+      <div class="modalSection">
+        <div class="helpSectionTitle">≈ Alternate Chords</div>
+        <div class="helpText">
+          Select a chord and tap <strong>≈</strong> to see suggestions:
+          <br>• Inversions (1st, 2nd)
+          <br>• Extensions (7th, 9th, 11th)
+          <br>• Suspended chords (sus2, sus4)
+          <br>• Relative major/minor
+          <br><br>Tap <strong>Apply</strong> to use any suggestion. The <strong>↶</strong> button appears to undo (up to 5 steps).
+        </div>
+      </div>
+
+      <div class="modalSection">
+        <div class="helpSectionTitle">💾 Chord Memory</div>
+        <div class="helpText">
+          <strong>12 scale banks</strong> (C through B), each with <strong>12 chord slots</strong>.
+          <br>• Use bank arrows <strong>◀ ▶</strong> to switch between scales
+          <br>• Tap a slot to save the current chord
+          <br>• Tap again to load a saved chord
+          <br>• Open Menu → Chord Memory to manage slots
+        </div>
+      </div>
+
+      <div class="modalSection">
+        <div class="helpSectionTitle">🎼 Two Modes</div>
+        <div class="helpText">
+          <strong>Free Transpose:</strong> Select and transpose any notes freely
+          <br><br><strong>Chord → Scale Mode:</strong> Practice chords through keys
+          <br>• Shows Roman numeral analysis
+          <br>• Chord slots update when you transpose
+          <br>• Perfect for learning chord progressions in different keys
+        </div>
+      </div>
+
+      <div class="modalSection">
+        <div class="helpSectionTitle">💾 Backup & Share</div>
+        <div class="helpText">
+          <strong>Export Data:</strong> Download all your chord banks as a JSON file
+          <br>• Backs up all 12 scale banks with saved chords
+          <br>• Save to cloud storage or share with others
+          <br><br><strong>Import Data:</strong> Restore from a previous backup
+          <br>• Select a previously exported JSON file
+          <br>• Replaces current data (backup first!)
+          <br>• Perfect for syncing across devices
+        </div>
+      </div>
+
+      <div class="modalSection">
+        <div class="helpSectionTitle">⚡ Quick Tips</div>
+        <div class="helpText">
+          • Tap <strong>Clear</strong> to deselect all notes
+          <br>• The app auto-detects and names chords
+          <br>• Custom name chords when saving to memory
+          <br>• Works offline when installed as a PWA
+          <br>• All data saved locally on your device
+        </div>
       </div>
     </div>
   </div>
