@@ -42,6 +42,7 @@ const elModeChordScale = document.getElementById("modeChordScale");
 const elModeHint = document.getElementById("modeHint");
 const elBtnOpenMemory = document.getElementById("btnOpenMemory");
 const elBtnPickScale = document.getElementById("btnPickScale");
+const elBtnHowTo = document.getElementById("btnHowTo");
 
 const elScaleSelect = document.getElementById("scaleSelect");
 const elBtnScaleAdd = document.getElementById("btnScaleAdd");
@@ -234,27 +235,6 @@ function maybeShowHowToOnFirstRun() {
   }, 200);
 }
 
-function injectHowToIntoMenu() {
-  if (!elMenuModal) return;
-  if (document.getElementById("btnHowTo")) return;
-
-  const host = elMenuModal.querySelector(".menuList") || elMenuModal.querySelector(".modalBody") || elMenuModal;
-  if (!host) return;
-
-  const btn = document.createElement("button");
-  btn.id = "btnHowTo";
-  btn.type = "button";
-  btn.className = "menuItem";
-  btn.textContent = "How to use";
-  btn.addEventListener("click", () => {
-    closeModal(elMenuModal);
-    openHowTo();
-  });
-
-  // Put it first
-  host.insertBefore(btn, host.firstChild);
-}
-
 // ===== Modal wiring =====
 function openModal(el) {
   if (!el) return;
@@ -312,6 +292,14 @@ if (elBtnPickScale) {
     syncMemoryModalGrid();
     openModal(elMemoryModal);
     if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
+  });
+}
+
+// Menu -> How to use (HTML-defined button)
+if (elBtnHowTo) {
+  elBtnHowTo.addEventListener("click", () => {
+    closeModal(elMenuModal);
+    openHowTo();
   });
 }
 
@@ -873,7 +861,7 @@ function syncMemoryModalGrid() {
 
         const autoName = detectChordNameFromSelected();
         const defaultName = (activeChordName || autoName || "").trim();
-        const name = await customPrompt("Name this chord (auto-filled, edit if you want):", defaultName);
+        const name = await customPrompt("Name chord", defaultName);
         if (name === null) return;
 
         const { min, max } = rangeMidis();
