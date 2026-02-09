@@ -1,9 +1,12 @@
-const CACHE_NAME = "piano-transposer-v3";
+const CACHE_NAME = "piano-transposer-v4";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./app.js",
+  "./js/utils.js",
+  "./js/chordDetection.js",
+  "./js/chordAlternates.js",
+  "./js/main.js",
   "./manifest.json",
   "./service-worker.js",
   // NOTE: icons are intentionally NOT pre-cached.
