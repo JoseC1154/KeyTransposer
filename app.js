@@ -42,7 +42,6 @@ const elModeChordScale = document.getElementById("modeChordScale");
 const elModeHint = document.getElementById("modeHint");
 const elBtnOpenMemory = document.getElementById("btnOpenMemory");
 const elBtnPickScale = document.getElementById("btnPickScale");
-const elBtnHowTo = document.getElementById("btnHowTo");
 
 const elScaleSelect = document.getElementById("scaleSelect");
 const elBtnScaleAdd = document.getElementById("btnScaleAdd");
@@ -167,74 +166,6 @@ function customPrompt(message, defaultValue = "") {
   });
 }
 
-// ===== How To Use (first-run modal) =====
-const HOWTO_HIDE_KEY = "pct_hide_howto_v1";
-
-let elHowToModal = null;
-let elHowToNever = null;
-
-function ensureHowToModal() {
-  if (elHowToModal) return;
-
-  const wrap = document.createElement("div");
-  wrap.id = "howToModal";
-  wrap.className = "modal";
-  wrap.hidden = true;
-  wrap.innerHTML = `
-    <div class="modalBackdrop" data-close="howToModal"></div>
-    <div class="modalCard" role="dialog" aria-modal="true" aria-label="How to use">
-      <div class="modalHeader">
-        <div class="modalTitle">How to use</div>
-        <button class="ghost" type="button" data-close="howToModal" aria-label="Close">✕</button>
-      </div>
-      <div class="modalBody">
-        <div class="modalHint" style="margin-bottom:10px;">Quick start (tap anywhere outside to close)</div>
-
-        <div class="howto">
-          <div class="howtoRow"><b>1) Select notes</b><div>Tap keys on the piano to build a chord.</div></div>
-          <div class="howtoRow"><b>2) Transpose</b><div>Use <b>▼</b> / <b>▲</b> to move by semitones.</div></div>
-          <div class="howtoRow"><b>3) Octaves</b><div>Use <b>−</b> / <b>+</b> to change the visible octave span.</div></div>
-          <div class="howtoRow"><b>4) Alternates</b><div>Tap <b>≈</b> to see inversions, extensions, sus/6, and related chords.</div></div>
-          <div class="howtoRow"><b>5) Chord → Scale mode</b><div>Open the menu (☰) → switch to <b>Chord → Scale</b> to use banks + memory.</div></div>
-          <div class="howtoRow"><b>6) Save / recall</b><div>In Chord → Scale, use slots <b>1–12</b> to save chords for the current scale bank.</div></div>
-        </div>
-      </div>
-      <div class="modalFooter">
-        <button id="btnHowToNever" class="ghost" type="button">Never show again</button>
-        <button class="primary" type="button" data-close="howToModal">Got it</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(wrap);
-  elHowToModal = wrap;
-  elHowToNever = wrap.querySelector("#btnHowToNever");
-
-  if (elHowToNever) {
-    elHowToNever.addEventListener("click", () => {
-      try { localStorage.setItem(HOWTO_HIDE_KEY, "1"); } catch {}
-      closeModal(elHowToModal);
-    });
-  }
-}
-
-function openHowTo() {
-  ensureHowToModal();
-  openModal(elHowToModal);
-}
-
-function maybeShowHowToOnFirstRun() {
-  let hide = false;
-  try { hide = localStorage.getItem(HOWTO_HIDE_KEY) === "1"; } catch {}
-  if (hide) return;
-  // Show after initial layout settles
-  setTimeout(() => {
-    // Don’t interrupt the chord naming prompt
-    if (elPromptModal && !elPromptModal.hidden) return;
-    openHowTo();
-  }, 200);
-}
-
 // ===== Modal wiring =====
 function openModal(el) {
   if (!el) return;
@@ -266,7 +197,6 @@ document.addEventListener("pointerdown", (e) => {
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (elPromptModal && !elPromptModal.hidden) return; // Let customPrompt handle it
-  if (elHowToModal && !elHowToModal.hidden) return closeModal(elHowToModal);
   if (elAlternatesModal && !elAlternatesModal.hidden) return closeModal(elAlternatesModal);
   if (elMemoryModal && !elMemoryModal.hidden) return closeModal(elMemoryModal);
   if (elMenuModal && !elMenuModal.hidden) return closeModal(elMenuModal);
@@ -292,14 +222,6 @@ if (elBtnPickScale) {
     syncMemoryModalGrid();
     openModal(elMemoryModal);
     if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
-  });
-}
-
-// Menu -> How to use (HTML-defined button)
-if (elBtnHowTo) {
-  elBtnHowTo.addEventListener("click", () => {
-    closeModal(elMenuModal);
-    openHowTo();
   });
 }
 
@@ -861,7 +783,7 @@ function syncMemoryModalGrid() {
 
         const autoName = detectChordNameFromSelected();
         const defaultName = (activeChordName || autoName || "").trim();
-        const name = await customPrompt("Name chord", defaultName);
+        const name = await customPrompt("Name this chord (auto-filled, edit if you want):", defaultName);
         if (name === null) return;
 
         const { min, max } = rangeMidis();
@@ -1269,4 +1191,81 @@ function renderPiano() {
 
     div.addEventListener("pointerup", (e) => {
       if (!isScrolling) {
-        handleKeyTogg
+        handleKeyToggle(k.midi);
+      }
+    });
+
+    // Position black key between the anchor white and the next white
+    // Black key is centered at the right edge of the anchor white key
+    const leftPx = (k.anchorWhiteIndex * (whiteW + gap)) + whiteW - (blackW / 2) + 10;
+    div.style.left = `${leftPx}px`;
+
+    elPiano.appendChild(div);
+  }
+}
+
+// Detect scrolling on piano container
+if (elPianoScroll) {
+  elPianoScroll.addEventListener("pointermove", (e) => {
+    if (pointerDownPos.x !== 0 || pointerDownPos.y !== 0) {
+      const deltaX = Math.abs(e.clientX - pointerDownPos.x);
+      const deltaY = Math.abs(e.clientY - pointerDownPos.y);
+      // If moved more than 5px, consider it scrolling
+      if (deltaX > 5 || deltaY > 5) {
+        isScrolling = true;
+      }
+    }
+  });
+
+  elPianoScroll.addEventListener("pointerup", () => {
+    pointerDownPos = { x: 0, y: 0 };
+  });
+
+  elPianoScroll.addEventListener("pointercancel", () => {
+    pointerDownPos = { x: 0, y: 0 };
+  });
+}
+
+function updateSelectionUI() {
+  const keys = elPiano.querySelectorAll(".key");
+  for (const k of keys) {
+    const midi = Number(k.dataset.midi);
+    k.classList.toggle("selected", selectedMidis.has(midi));
+  }
+}
+
+window.addEventListener("resize", () => {
+  applyResponsiveSizing();
+  renderPiano();
+  updateSelectionUI();
+  updateHeader();
+  updateHint();
+});
+
+// Service worker registration
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", async () => {
+    try {
+      const reg = await navigator.serviceWorker.register("./service-worker.js");
+      elStatus.textContent = reg.active ? "Offline-ready." : "Service worker installed.";
+    } catch {
+      elStatus.textContent = "Offline not available (SW failed).";
+    }
+  });
+}
+
+// Init
+loadState();
+rebuildScaleSelect();
+setMode(appMode);
+setCurrentScalePc(currentScalePc);
+updateBankDisplay();
+renderMemoryButtons();
+syncMemoryModalGrid();
+setChordName("");
+
+applyResponsiveSizing();
+renderPiano();
+updateHeader();
+updateHint();
+
