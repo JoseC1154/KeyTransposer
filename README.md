@@ -45,6 +45,9 @@ All requested improvements have been implemented:
    * Uses `env(safe-area-inset-*)` for all edges
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 4. ✅ **5-Step Undo System** — Quick way to return to previous chords:
 
    * Undo button (↶) appears after applying alternate chords
@@ -75,9 +78,12 @@ All requested improvements have been implemented:
    * Automatically activates when height ≤ 600px
 
 8. ✅ **Removed "$1" Bug** — Clean header display
+<<<<<<< HEAD
+=======
 =======
 4. ✅ **Removed “$1” Bug** — Clean header display
 >>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 
 ---
 
@@ -123,6 +129,9 @@ All requested improvements have been implemented:
 
 * Suggests related chords and voicings based on selected notes
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 * 5-step undo history (↶ button)
 * Quick experimentation with different voicings
 
@@ -138,8 +147,11 @@ All requested improvements have been implemented:
 * Built-in "How to Use" guide
 * Comprehensive feature documentation
 * Quick reference for all controls
+<<<<<<< HEAD
+=======
 =======
 >>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 
 ### PWA Support
 
@@ -160,9 +172,15 @@ All requested improvements have been implemented:
 | Memory slots | Save and recall chords           |
 | Menu         | Modes, scales, backup, help      |
 =======
+<<<<<<< HEAD
+| ↶            | Undo alternate chord (5 steps)   |
+| Memory slots | Save and recall chords           |
+| Menu         | Modes, scales, backup, help      |
+=======
 | Memory slots | Save and recall chords           |
 | Menu         | Modes, scales, and settings      |
 >>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 
 ---
 
@@ -207,10 +225,15 @@ http://localhost:8000
 ## To Do
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 * In **Chord → Scale** mode, make ▲/▼ transpose the **selected chord starting point** and update the **scale bank label** accordingly (example: if you're in **F#** major and transpose down 1 step, it should show **F** major).
 * Fix note letter positioning so the letters sit correctly centered on the key circles.
 * Menu: "Scale" and "Chord Memory" currently route to the same modal — separate these into the correct destinations.
 * Fix logic, check the reasoning for alternate chord "I created an f# maj chord , saved it then used the alternative button and what it suggested was a Db Maj,"
+<<<<<<< HEAD
+=======
 =======
 * Add a quick way to return to the previous chord after applying an alternate chord suggestion.
 * In **Chord → Scale** mode, make ▲/▼ transpose the **selected chord starting point** and update the **scale bank label** accordingly (example: if you’re in **F#** major and transpose down 1 step, it should show **F** major).
@@ -221,6 +244,7 @@ http://localhost:8000
 * Menu: “Scale” and “Chord Memory” currently route to the same modal — separate these into the correct destinations.
 * Fix logic, check the reasoning for alterante chord "I created an f# maj chord , saved it then used the alternative button and what it sugested was a Db Maj,"
 >>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 
 ---
 
@@ -232,8 +256,12 @@ http://localhost:8000
 <<<<<<< HEAD
 * Cloud sync integration
 =======
+<<<<<<< HEAD
+* Cloud sync integration
+=======
 * Export / import chord banks
 >>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
+>>>>>>> 18bc7969966f72503fdd067415b60cf8b4a56de2
 
 ---
 
