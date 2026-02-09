@@ -44,7 +44,40 @@ All requested improvements have been implemented:
    * Hamburger menu is fully accessible
    * Uses `env(safe-area-inset-*)` for all edges
 
+<<<<<<< HEAD
+4. ✅ **5-Step Undo System** — Quick way to return to previous chords:
+
+   * Undo button (↶) appears after applying alternate chords
+   * Maintains history of up to 5 chord changes
+   * Shows number of available undo steps (↶2, ↶3, etc.)
+   * Click repeatedly to step back through history
+
+5. ✅ **Export / Import Backup** — Share and backup your chord banks:
+
+   * Export all 12 scale banks to JSON file
+   * Import from previous backups
+   * Perfect for syncing across devices or sharing with others
+   * Includes validation to prevent corrupted data
+
+6. ✅ **Help Modal** — Built-in "How to Use" guide:
+
+   * Accessible from the menu
+   * Comprehensive instructions for all features
+   * Explains controls, modes, and workflows
+   * Mobile-friendly scrollable interface
+
+7. ✅ **Landscape Mode Optimizations** — Reduced modal footprint in landscape orientation:
+
+   * Modals use 30% less vertical space
+   * Wider layout (680px) for better horizontal space usage
+   * Compact padding and fonts for density
+   * All elements remain touch-friendly
+   * Automatically activates when height ≤ 600px
+
+8. ✅ **Removed "$1" Bug** — Clean header display
+=======
 4. ✅ **Removed “$1” Bug** — Clean header display
+>>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
 
 ---
 
@@ -89,6 +122,24 @@ All requested improvements have been implemented:
 ### Alternate Chords
 
 * Suggests related chords and voicings based on selected notes
+<<<<<<< HEAD
+* 5-step undo history (↶ button)
+* Quick experimentation with different voicings
+
+### Backup & Share
+
+* Export all chord banks to JSON file
+* Import from previous backups
+* Sync data across multiple devices
+* Share chord collections with others
+
+### Help System
+
+* Built-in "How to Use" guide
+* Comprehensive feature documentation
+* Quick reference for all controls
+=======
+>>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
 
 ### PWA Support
 
@@ -104,8 +155,14 @@ All requested improvements have been implemented:
 | − / +        | Change number of octaves         |
 | ▼ / ▲        | Transpose down or up             |
 | ≈            | Show alternate chord suggestions |
+<<<<<<< HEAD
+| ↶            | Undo alternate chord (5 steps)   |
+| Memory slots | Save and recall chords           |
+| Menu         | Modes, scales, backup, help      |
+=======
 | Memory slots | Save and recall chords           |
 | Menu         | Modes, scales, and settings      |
+>>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
 
 ---
 
@@ -149,6 +206,12 @@ http://localhost:8000
 
 ## To Do
 
+<<<<<<< HEAD
+* In **Chord → Scale** mode, make ▲/▼ transpose the **selected chord starting point** and update the **scale bank label** accordingly (example: if you're in **F#** major and transpose down 1 step, it should show **F** major).
+* Fix note letter positioning so the letters sit correctly centered on the key circles.
+* Menu: "Scale" and "Chord Memory" currently route to the same modal — separate these into the correct destinations.
+* Fix logic, check the reasoning for alternate chord "I created an f# maj chord , saved it then used the alternative button and what it suggested was a Db Maj,"
+=======
 * Add a quick way to return to the previous chord after applying an alternate chord suggestion.
 * In **Chord → Scale** mode, make ▲/▼ transpose the **selected chord starting point** and update the **scale bank label** accordingly (example: if you’re in **F#** major and transpose down 1 step, it should show **F** major).
 * Add Share button for **export / import** (backup and restore chord banks).
@@ -157,6 +220,7 @@ http://localhost:8000
 * Landscape: reduce modal footprint (button-sized launcher or more compact modal layout).
 * Menu: “Scale” and “Chord Memory” currently route to the same modal — separate these into the correct destinations.
 * Fix logic, check the reasoning for alterante chord "I created an f# maj chord , saved it then used the alternative button and what it sugested was a Db Maj,"
+>>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
 
 ---
 
@@ -165,7 +229,11 @@ http://localhost:8000
 * Root note highlighting
 * Minor key roman numeral analysis
 * MIDI input support
+<<<<<<< HEAD
+* Cloud sync integration
+=======
 * Export / import chord banks
+>>>>>>> 1ce5b31fd445330305b2dea7fd726fba38dde489
 
 ---
 
