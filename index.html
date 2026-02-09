@@ -97,13 +97,14 @@
   <div class="modal" id="menuModal" hidden>
     <div class="modalOverlay" data-close="menuModal"></div>
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
-      <div class="modalHead">
-        <div class="modalTitle" id="menuTitle">Menu</div>
-        <button class="ghost" type="button" data-close="menuModal" aria-label="Close">✕</button>
+      $1
+      <div class="modalSection">
+        <div class="modalLabel">How to use</div>
+        <button class="ghost" type="button" id="btnHowTo">How to use the app</button>
+        <div class="modalHint">Quick help and tips. You can disable the first-run popup inside the guide.</div>
       </div>
 
-      <div class="modalSection">
-        <div class="modalLabel">Mode</div>
+$2
         <div class="modeRow" role="group" aria-label="App mode">
           <button class="modeBtn" type="button" id="modeFree" data-mode="free">Free Transpose</button>
           <button class="modeBtn" type="button" id="modeChordScale" data-mode="chordScale">Chord → Scale</button>
