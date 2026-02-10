@@ -18,6 +18,7 @@ const elRangeText = document.getElementById("rangeText");
 const elChordNameText = document.getElementById("chordNameText");
 const elOctaveText = document.getElementById("octaveText");
 const elStatus = document.getElementById("status");
+const elTransposeKeyText = document.getElementById("transposeKeyText");
 const elTransposeHint = document.getElementById("transposeHint");
 
 const elTopbar = document.getElementById("topbar");
@@ -417,6 +418,7 @@ function updateBankDisplay() {
     elBtnBankCurrent.textContent = NOTES_SHARP[currentScalePc];
   }
   updateMemoryMeta();
+  updateTransposeKeyDisplay();
   renderMemoryButtons();
   syncMemoryModalGrid();
 }
@@ -586,6 +588,7 @@ function setCurrentScalePc(pc) {
   activeBankPc = -1;
   setChordName("");
   updateMemoryMeta();
+  updateTransposeKeyDisplay();
   saveState();
   renderMemoryButtons();
   syncMemoryModalGrid();
@@ -870,7 +873,13 @@ if (elBtnSlotClear) {
 // ===== Persistence =====
 function saveState() {
   try {
-    const payload = { appMode, currentScalePc, bankChords };
+    const payload = { 
+      appMode, 
+      currentScalePc, 
+      bankChords,
+      memoryCollapsed: elMemoryCard?.classList.contains('collapsed') ?? false,
+      controlsCollapsed: elControls?.classList.contains('collapsed') ?? false
+    };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // ignore
@@ -904,6 +913,16 @@ function loadState() {
       }
       bankChords = next;
     }
+
+    // Restore collapsed states
+    if (typeof p.memoryCollapsed === 'boolean') {
+      elMemoryCard?.classList.toggle('collapsed', p.memoryCollapsed);
+      document.getElementById('btnToggleMemory')?.setAttribute('aria-expanded', !p.memoryCollapsed);
+    }
+    if (typeof p.controlsCollapsed === 'boolean') {
+      elControls?.classList.toggle('collapsed', p.controlsCollapsed);
+      document.getElementById('btnToggleControls')?.setAttribute('aria-expanded', !p.controlsCollapsed);
+    }
   } catch {
     // ignore
   }
@@ -929,6 +948,12 @@ function transposeSelection(deltaSemitone) {
   updateHint();
 }
 
+
+function updateTransposeKeyDisplay() {
+  if (elTransposeKeyText) {
+    elTransposeKeyText.textContent = NOTES_SHARP[currentScalePc];
+  }
+}
 
 function updateHint() {
   if (selectedMidis.size === 0) {
@@ -1182,6 +1207,26 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// ===== Section Toggles =====
+const elBtnToggleMemory = document.getElementById("btnToggleMemory");
+const elBtnToggleControls = document.getElementById("btnToggleControls");
+
+if (elBtnToggleMemory) {
+  elBtnToggleMemory.addEventListener("click", () => {
+    const isCollapsed = elMemoryCard.classList.toggle("collapsed");
+    elBtnToggleMemory.setAttribute("aria-expanded", !isCollapsed);
+    saveState();
+  });
+}
+
+if (elBtnToggleControls) {
+  elBtnToggleControls.addEventListener("click", () => {
+    const isCollapsed = elControls.classList.toggle("collapsed");
+    elBtnToggleControls.setAttribute("aria-expanded", !isCollapsed);
+    saveState();
+  });
+}
+
 // Init
 loadState();
 rebuildScaleSelect();
@@ -1195,5 +1240,6 @@ setChordName("");
 applyResponsiveSizing();
 renderPiano();
 updateHeader();
+updateTransposeKeyDisplay();
 updateHint();
 

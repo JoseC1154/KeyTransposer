@@ -40,8 +40,12 @@
       </div>
     </section>
     <!-- ===== CHORD MEMORY (12 slots) ===== -->
-    <section class="memoryCard" id="memoryCard" aria-label="Chord memory">
-      <div class="memoryHead">
+    <div class="sectionWrapper">
+      <button class="sectionToggle" id="btnToggleMemory" type="button" aria-label="Toggle chord memory" aria-expanded="false">
+        <span class="toggleIcon">◀</span>
+      </button>
+      <section class="memoryCard collapsed" id="memoryCard" aria-label="Chord memory">
+        <div class="memoryHead">
         <div class="memoryTitle">Chord Memory</div>
         <div class="memoryMeta" id="memoryMeta">Mode: Free</div>
         <div class="bankSelector" id="bankSelector">
@@ -65,10 +69,15 @@
         <button class="memBtn" type="button" data-slot="10" aria-label="Memory slot 11">11</button>
         <button class="memBtn" type="button" data-slot="11" aria-label="Memory slot 12">12</button>
       </div>
-    </section>
+      </section>
+    </div>
 
     <!-- ===== SINGLE-LINE CONTROL BAR (NO SCROLL ON MOBILE) ===== -->
-    <section class="controlBar" id="controls" aria-label="Controls">
+    <div class="sectionWrapper">
+      <button class="sectionToggle" id="btnToggleControls" type="button" aria-label="Toggle controls" aria-expanded="false">
+        <span class="toggleIcon">◀</span>
+      </button>
+      <section class="controlBar collapsed" id="controls" aria-label="Controls">
       <button class="ctrl mini" id="btnMinus" type="button" aria-label="Remove octave">−</button>
       <button class="ctrl mini" id="btnPlus" type="button" aria-label="Add octave">+</button>
 
@@ -84,10 +93,12 @@
       </div>
 
       <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
+      <button class="ctrl mini transposeKey" id="transposeKeyText" type="button" aria-label="Current transpose key">C</button>
       <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
       <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
-      <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
-    </section>
+        <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
+      </section>
+    </div>
 
     <footer class="footer" id="footer">
       <span id="status">Offline-ready.</span>
