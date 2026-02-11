@@ -100,7 +100,7 @@ All requested improvements have been implemented:
 
    * Accessible from the menu
    * Comprehensive instructions for all features
-   * Explains controls, modes, and workflows
+   * Explains controls, workflows, and tips
    * Mobile-friendly scrollable interface
 
 7. ✅ **Landscape Mode Optimizations** — Reduced modal footprint in landscape orientation:
@@ -142,17 +142,6 @@ All requested improvements have been implemented:
 * Chords stored with their associated scale
 * Slots update correctly when transposing
 
-### Modes
-
-**Free Transpose**
-
-* Select and transpose notes freely
-
-**Chord → Scale Mode**
-
-* Practice chords through different keys
-* Roman numeral analysis shown relative to scale
-
 ### Alternate Chords
 
 * Suggests related chords and voicings based on selected notes
@@ -188,7 +177,7 @@ All requested improvements have been implemented:
 | ≈            | Show alternate chord suggestions |
 | ↶            | Undo alternate chord (5 steps)   |
 | Memory slots | Save and recall chords           |
-| Menu         | Modes, scales, backup, help      |
+| Menu         | Scale banks, memory tools, backup, help |
 
 ---
 
@@ -203,11 +192,14 @@ All requested improvements have been implemented:
 ## File Structure
 
 ```
-index.html          Main UI layout
-styles.css          Layout and responsive styling
-app.js              Piano logic, transposition, memory, detection
-manifest.json       PWA manifest
-service-worker.js   Offline caching
+index.html              Main UI layout
+styles.css              Layout and responsive styling
+js/utils.js             Shared helpers and constants
+js/chordDetection.js    Chord naming logic
+js/chordAlternates.js   Alternate chord generation
+js/main.js              Piano logic, transposition, memory, detection
+manifest.json           PWA manifest
+service-worker.js       Offline caching
 ```
 
 ---
@@ -232,7 +224,6 @@ http://localhost:8000
 
 ## To Do
 
-* In **Chord → Scale** mode, make ▲/▼ transpose the **selected chord starting point** and update the **scale bank label** accordingly (example: if you're in **F#** major and transpose down 1 step, it should show **F** major).
 * Fix note letter positioning so the letters sit correctly centered on the key circles.
 * Menu: "Scale" and "Chord Memory" currently route to the same modal — separate these into the correct destinations.
 * Fix logic, check the reasoning for alternate chord "I created an f# maj chord , saved it then used the alternative button and what it suggested was a Db Maj,"

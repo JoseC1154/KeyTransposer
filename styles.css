@@ -115,125 +115,97 @@ body::before{
   flex-direction: column;
   gap: 10px;
 }
-.main:has(.memoryCard.collapsed):has(.controlBar.collapsed){
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
-  gap: 10px;
-}
-.main:has(.memoryCard.collapsed):has(.controlBar.collapsed) .pianoScroll{
-  grid-column: 1 / -1;
-}
-.main:has(.memoryCard.collapsed):has(.controlBar.collapsed) .footer{
-  grid-column: 1 / -1;
-}
-
-/* ===== Chord Memory ===== */
-.sectionWrapper{
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-  min-height: 50px;
-}
-
-.sectionToggle{
-  display: flex;
-  width: 32px;
-  min-width: 32px;
-  height: auto;
-  background: rgba(29,185,84,0.12);
-  border: 1px solid rgba(29,185,84,0.35);
-  border-radius: 10px;
-  color: var(--accent);
-  font-weight: 900;
-  font-size: 16px;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.12s ease, transform 0.08s ease;
-  padding: 0;
-  flex-shrink: 0;
-}
-.sectionToggle:hover{
-  background: rgba(29,185,84,0.18);
-}
-.sectionToggle:active{
-  transform: scale(0.98);
-}
-.toggleIcon{
-  font-size: 16px;
-  transition: transform 0.2s ease;
-  display: block;
-}
-
-.memoryCard{
+/* ===== Command Deck ===== */
+.commandDeck{
   background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.08));
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: var(--radius);
-  padding: 10px;
-  transition: all 0.3s ease;
-  flex: 1;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.memoryCard.collapsed .memoryHead,
-.memoryCard.collapsed .memoryGrid{
-  display: none;
-}
-.memoryCard.collapsed{
-  padding: 0;
-  min-width: 0;
-  width: 0;
-  border: none;
-  overflow: hidden;
-}
-.sectionWrapper:has(.memoryCard:not(.collapsed)) .toggleIcon,
-.sectionWrapper:has(.controlBar:not(.collapsed)) .toggleIcon{
-  transform: rotate(180deg);
-}
-.memoryHead{
-  display: grid;
-  grid-template-columns: auto 1fr auto auto;
+
+.deckTop{
+  display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
-.memoryTitle{
+
+.deckTitleBlock{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.deckTitle{
   font-weight: 900;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
+  font-size: 16px;
 }
+
 .memoryMeta{
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
 }
 
-/* Bank Selector */
+.deckRow{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.controlRow{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.primaryControls > *{
+  flex: 1 1 220px;
+}
+
+.primaryControls .transposeCluster{
+  justify-content: center;
+}
+
+.deckLabel{
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .bankSelector{
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
 .bankBtn{
-  height: 50px;
-  min-width: 50px;
-  padding: 0 10px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
+  height: 44px;
+  min-width: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.05);
   color: var(--text);
-  font-weight: 700;
-  font-size: 14px;
+  font-weight: 800;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
 }
 
-.bankBtn:hover{
-  background: rgba(255,255,255,0.08);
-}
-
-.bankBtn:active{
-  transform: translateY(1px);
-}
+.bankBtn:hover{ background: rgba(255,255,255,0.08); }
+.bankBtn:active{ transform: translateY(1px); }
 
 .bankBtn.bankCurrent{
   min-width: 54px;
@@ -244,8 +216,90 @@ body::before{
   font-size: 15px;
 }
 
-.bankBtn.bankCurrent:hover{
-  background: rgba(29,185,84,0.18);
+.bankBtn.bankCurrent:hover{ background: rgba(29,185,84,0.18); }
+
+.deckControls{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Calculator-style deck layout */
+.calculatorDeck{
+  display: grid;
+  /* Use 6 equal columns so 3-button groups can each occupy 3 columns (one per button)
+     which yields matching square buttons for bankSelector and transposeCluster */
+  grid-template-columns: repeat(6, minmax(56px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.calculatorDeck .hud{ grid-column: 1 / -1; }
+.calculatorDeck .bankSelector{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; grid-column: 1 / 4; }
+.calculatorDeck .transposeCluster{ display: grid; grid-template-columns: repeat(3, 1fr); gap:8px; grid-column: 4 / 7; justify-items: center; }
+.calculatorDeck .octaveAltCluster{ grid-column: 1 / -1; display:flex; gap:8px; justify-content:space-between; }
+
+.calculatorDeck .bankBtn,
+.calculatorDeck .ctrl{
+  aspect-ratio: 1/1;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+/* Make primary calculator buttons slightly larger on wide screens */
+@media (min-width: 700px){
+  .calculatorDeck .bankBtn{ font-size: 20px; }
+  .calculatorDeck .ctrl{ font-size: 20px; }
+}
+
+.deckControls .hud{
+  width: 100%;
+}
+
+.cluster,
+.transposeCluster{
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.secondaryControls{
+  justify-content: stretch;
+}
+
+.octaveAltCluster{
+  display: flex;
+  flex: 1 1 220px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.octaveAltCluster .ctrl{
+  flex: 1 1 calc(25% - 8px);
+  min-width: 64px;
+}
+
+.cluster .ctrl,
+.transposeCluster .ctrl{
+  flex: 1;
+}
+
+.hud{
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.18);
+}
+
+.transposeCluster .ctrl{
+  min-width: 0;
 }
 
 .ctrl.transposeKey{
@@ -259,9 +313,9 @@ body::before{
   pointer-events: none;
 }
 
-.memoryGrid{
+.memoryStrip{
   display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
   gap: 8px;
 }
 .memBtn{
@@ -285,22 +339,22 @@ body::before{
 }
 
 @media (max-width: 520px){
-  .main:has(.memoryCard.collapsed):has(.controlBar.collapsed){
-    grid-template-columns: 1fr;
-  }
-  .memoryHead{ 
-    grid-template-columns: 1fr auto; 
-    grid-auto-rows: auto; 
-  }
-  .memoryTitle{ grid-column: 1; grid-row: 1; }
-  .btnMemory{ grid-column: 2; grid-row: 1; }
-  .bankSelector{ grid-column: 1; grid-row: 2; }
-  .memoryMeta{ grid-column: 2; grid-row: 2; justify-self: end; }
-  .memoryGrid{ grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .wrap{ padding: 8px 10px 12px; gap: 8px; }
+  .commandDeck{ padding: 12px; gap: 12px; }
+  .deckTop{ flex-direction: column; align-items: flex-start; }
+  .deckControls{ gap: 10px; }
+  .cluster,
+  .transposeCluster{ gap: 8px; }
+  .memoryStrip{ grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .ctrl{ height: 48px; font-size: 20px; border-radius: 14px; }
+  .hud{ padding: 6px 8px; }
+  .hudLabel{ font-size: 11px; }
+  .hudValue{ font-size: 12px; }
+  .piano{ padding: 8px 8px 10px; }
 }
 
 @media (min-width: 900px){
-  .memoryGrid{ gap: 10px; }
+  .memoryStrip{ gap: 10px; }
 }
 
 .pianoScroll{
@@ -310,6 +364,37 @@ body::before{
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: rgba(29,185,84,0.3) rgba(255,255,255,0.05);
+}
+
+/* Keep piano visible on scroll: make container sticky and bound height */
+.pianoContainer{
+  position: sticky;
+  top: calc(var(--safe-top) + 84px);
+  z-index: 5;
+  display: block;
+}
+
+.pianoScroll{
+  /* Prevent the piano from pushing entirely out of viewport on tall pages */
+  max-height: calc(100vh - (var(--safe-top) + 140px));
+}
+
+/* Ensure the content after the piano doesn't sit under it */
+.pianoContainer{
+  margin-bottom: 10px;
+}
+
+.pianoContainer + .memoryStrip,
+.pianoContainer + .memoryStrip + *{
+  /* Reserve vertical space equal to piano height so following content is never obscured
+     Use the `--white-h` CSS variable set by JS for responsive piano height. */
+  margin-top: calc(var(--white-h, 180px) + 18px);
+}
+
+/* Visual separation so overlapping is obvious if it still occurs */
+.piano{
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  border-radius: 12px;
 }
 
 .pianoScroll::-webkit-scrollbar{
@@ -427,31 +512,7 @@ body::before{
   transform: translateY(0);
 }
 
-/* ===== Single-line Controls ===== */
-.controlBar{
-  display: grid;
-  grid-template-columns: 56px 56px 1fr 56px 56px 56px 56px;
-  gap: 10px;
-  align-items: center;
-  background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: var(--radius);
-  padding: 10px;
-  transition: all 0.3s ease;
-  flex: 1;
-}
-.controlBar.collapsed{
-  padding: 0;
-  min-width: 0;
-  width: 0;
-  border: none;
-  overflow: hidden;
-}
-.controlBar.collapsed .ctrl,
-.controlBar.collapsed .hud{
-  display: none;
-}
-
+/* ===== Controls ===== */
 .ctrl{
   height: 54px;
   border-radius: 16px;
@@ -477,6 +538,17 @@ body::before{
   border-radius: 14px;
 }
 
+.transposeCluster{
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  flex: 0 0 auto;
+}
+
+.transposeCluster .ctrl{
+  flex: 0 0 56px;
+}
+
 .hud{
   min-width: 0;
   display: flex;
@@ -486,6 +558,55 @@ body::before{
   border-radius: 14px;
   border: 1px solid rgba(255,255,255,0.10);
   background: rgba(0,0,0,0.18);
+}
+
+/* When hud is moved into the header, make it horizontal and compact */
+/* HUD lives in the topbar header permanently — display horizontally */
+.topbar .hud{
+  flex-direction: row;
+  gap: 10px;
+  padding: 6px 8px;
+  align-items: center;
+}
+
+@media (max-width: 520px) and (orientation: landscape) {
+  .brand{ align-items: center; }
+  .titles{ margin-right: 8px; }
+}
+
+/* Place HUD to the right of titles when width > height (landscape),
+   otherwise force HUD below the titles (portrait) */
+@media (max-aspect-ratio: 1/1) {
+  .brand{
+    /* allow wrapping so HUD can move to its own row */
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .brand .hud{
+    order: 2;
+    flex-basis: 100%;
+    margin-top: 6px;
+  }
+  .brand .titles{
+    order: 1;
+    flex: 1 1 auto;
+  }
+}
+
+@media (min-aspect-ratio: 1/1) {
+  .brand{
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+  .brand .hud{
+    order: 2;
+    flex-basis: auto;
+    margin-top: 0;
+  }
+  .brand .titles{
+    order: 1;
+  }
 }
 
 .hudRow{
@@ -515,23 +636,6 @@ body::before{
   padding: 2px 2px 0;
 }
 
-@media (max-width: 520px){
-  .wrap{ padding: 8px 10px 12px; gap: 8px; }
-
-  .controlBar{
-    grid-template-columns: 52px 52px 1fr 52px 52px 52px 52px;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .ctrl{ height: 48px; font-size: 20px; border-radius: 14px; }
-  .hud{ padding: 6px 8px; }
-  .hudLabel{ font-size: 11px; }
-  .hudValue{ font-size: 12px; }
-
-  .piano{ padding: 8px 8px 10px; }
-}
-
 /* ===== Landscape Layout Optimizations ===== */
 @media (orientation: landscape) and (max-height: 600px) {
   .topbar{
@@ -558,11 +662,8 @@ body::before{
   .ctrl.mini{
     height: 42px;
   }
-  
-  .controlBar{
-    padding: 8px;
-    gap: 8px;
-  }
+  .commandDeck{ padding: 10px; gap: 10px; }
+  .deckControls{ gap: 8px; }
   
   .hud{
     padding: 4px 8px;
@@ -575,27 +676,13 @@ body::before{
   .hudValue{
     font-size: 12px;
   }
-  
-  .memoryCard{
-    padding: 8px;
-  }
-  
-  .memoryHead{
-    gap: 8px;
-    padding: 4px 0;
-  }
-  
-  .memoryTitle{
-    font-size: 13px;
-  }
-  
-  .memoryMeta{
-    font-size: 11px;
-  }
+  .memoryStrip{ gap: 6px; }
+  .memoryMeta{ font-size: 11px; }
   
   .footer{
     font-size: 11px;
   }
+
 }
 
 
@@ -664,28 +751,6 @@ body::before{
   margin-top: 8px;
 }
 
-.modeRow{
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.modeBtn{
-  height: 46px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.05);
-  color: var(--text);
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.modeBtn.active{
-  border-color: rgba(29,185,84,0.45);
-  background: rgba(29,185,84,0.12);
-  box-shadow: 0 0 0 3px rgba(29,185,84,0.25);
-}
-
 .scalePickerRow{
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -715,16 +780,11 @@ select{
 
 @media (max-width: 520px){
   .modalCard{ width: 100%; max-height: 82dvh; }
-  .modeRow{ grid-template-columns: 1fr; }
   .scalePickerRow{ grid-template-columns: 1fr; }
   .actionRow{ grid-template-columns: 1fr; }
 }
 
 
-/* Hide memory card in Free Transpose mode */
-.memoryCard[hidden]{
-  display:none !important;
-}
 
 /* ===== Custom Prompt Modal ===== */
 .promptCard{
@@ -900,11 +960,6 @@ select{
     margin-top: 6px;
   }
   
-  .modeBtn{
-    height: 40px;
-    font-size: 13px;
-  }
-  
   .ghost{
     height: 40px;
     font-size: 13px;
@@ -951,8 +1006,8 @@ select{
     font-size: 12px;
   }
   
-  /* Make memory grid more compact in landscape */
-  .memoryGrid{
+  /* Make memory strip more compact in landscape */
+  .memoryStrip{
     gap: 6px;
   }
   

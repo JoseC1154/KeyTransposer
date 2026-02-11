@@ -12,66 +12,278 @@ let octaves = 2;
 
 let selectedMidis = new Set();
 
-const elPiano = document.getElementById("piano");
-const elPianoScroll = document.getElementById("pianoScroll");
-const elRangeText = document.getElementById("rangeText");
-const elChordNameText = document.getElementById("chordNameText");
-const elOctaveText = document.getElementById("octaveText");
-const elStatus = document.getElementById("status");
-const elTransposeKeyText = document.getElementById("transposeKeyText");
-const elTransposeHint = document.getElementById("transposeHint");
+let elPiano;
+let elPianoScroll;
+let elRangeText;
+let elChordNameText;
+let elOctaveText;
+let elStatus;
+let elTransposeKeyText;
+let elTransposeHint;
 
-const elTopbar = document.getElementById("topbar");
-const elControls = document.getElementById("controls");
-const elFooter = document.getElementById("footer");
+let elTopbar;
+let elCommandDeck;
+let elFooter;
 
-// ===== Chord Memory + Modes =====
-const elBtnMenu = document.getElementById("btnMenu");
-const elMenuModal = document.getElementById("menuModal");
-const elMemoryCard = document.getElementById("memoryCard");
-const elMemoryMeta = document.getElementById("memoryMeta");
-const elBtnMemory = document.getElementById("btnMemory");
-const elMemoryModal = document.getElementById("memoryModal");
-const elMemoryGrid = document.getElementById("memoryGrid");
-const elMemoryGridModal = document.getElementById("memoryGridModal");
+// ===== Chord Memory & Controls =====
+let elBtnMenu;
+let elMenuModal;
+let elMemoryMeta;
+let elBtnMemory;
+let elMemoryModal;
+let elMemoryGrid;
+let elMemoryGridModal;
 
-const elModeFree = document.getElementById("modeFree");
-const elModeChordScale = document.getElementById("modeChordScale");
-const elModeHint = document.getElementById("modeHint");
-const elBtnOpenMemory = document.getElementById("btnOpenMemory");
-const elBtnPickScale = document.getElementById("btnPickScale");
+let elBtnOpenMemory;
+let elBtnPickScale;
 
-const elScaleSelect = document.getElementById("scaleSelect");
-const elBtnScaleAdd = document.getElementById("btnScaleAdd");
-const elBtnScaleRemove = document.getElementById("btnScaleRemove");
-const elSlotHint = document.getElementById("slotHint");
-const elBtnSlotLoad = document.getElementById("btnSlotLoad");
-const elBtnSlotClear = document.getElementById("btnSlotClear");
+let elScaleSelect;
+let elBtnScaleAdd;
+let elBtnScaleRemove;
+let elSlotHint;
+let elBtnSlotLoad;
+let elBtnSlotClear;
 
-// ===== Bank Selector =====
-const elBankSelector = document.getElementById("bankSelector");
-const elBtnBankPrev = document.getElementById("btnBankPrev");
-const elBtnBankCurrent = document.getElementById("btnBankCurrent");
-const elBtnBankNext = document.getElementById("btnBankNext");
+let elBankSelector;
+let elBtnBankPrev;
+let elBtnBankCurrent;
+let elBtnBankNext;
 
-// ===== Alternates =====
-const elBtnAlternates = document.getElementById("btnAlternates");
-const elAlternatesModal = document.getElementById("alternatesModal");
-const elAlternatesList = document.getElementById("alternatesList");
-const elBtnUndo = document.getElementById("btnUndo");
+let elBtnAlternates;
+let elAlternatesModal;
+let elAlternatesList;
+let elBtnUndo;
 
-// ===== Help =====
-const elBtnHelp = document.getElementById("btnHelp");
-const elHelpModal = document.getElementById("helpModal");
+let elBtnHelp;
+let elHelpModal;
 
-// ===== Export / Import =====
-const elBtnExport = document.getElementById("btnExport");
-const elBtnImport = document.getElementById("btnImport");
-const elFileInput = document.getElementById("fileInput");
+let elBtnExport;
+let elBtnImport;
+let elFileInput;
+
+let elPromptModal;
+let elPromptInput;
+let elPromptOk;
+
+function cacheDomRefs() {
+  elPiano = document.getElementById("piano");
+  elPianoScroll = document.getElementById("pianoScroll");
+  elRangeText = document.getElementById("rangeText");
+  elChordNameText = document.getElementById("chordNameText");
+  elOctaveText = document.getElementById("octaveText");
+  elStatus = document.getElementById("status");
+  elTransposeKeyText = document.getElementById("transposeKeyText");
+  elTransposeHint = document.getElementById("transposeHint");
+
+  elTopbar = document.getElementById("topbar");
+  elCommandDeck = document.getElementById("commandDeck");
+  elFooter = document.getElementById("footer");
+
+  elBtnMenu = document.getElementById("btnMenu");
+  elMenuModal = document.getElementById("menuModal");
+  elMemoryMeta = document.getElementById("memoryMeta");
+  elBtnMemory = document.getElementById("btnMemory");
+  elMemoryModal = document.getElementById("memoryModal");
+  elMemoryGrid = document.getElementById("memoryGrid");
+  elMemoryGridModal = document.getElementById("memoryGridModal");
+
+  elBtnOpenMemory = document.getElementById("btnOpenMemory");
+  elBtnPickScale = document.getElementById("btnPickScale");
+
+  elScaleSelect = document.getElementById("scaleSelect");
+  elBtnScaleAdd = document.getElementById("btnScaleAdd");
+  elBtnScaleRemove = document.getElementById("btnScaleRemove");
+  elSlotHint = document.getElementById("slotHint");
+  elBtnSlotLoad = document.getElementById("btnSlotLoad");
+  elBtnSlotClear = document.getElementById("btnSlotClear");
+
+  elBankSelector = document.getElementById("bankSelector");
+  elBtnBankPrev = document.getElementById("btnBankPrev");
+  elBtnBankCurrent = document.getElementById("btnBankCurrent");
+  elBtnBankNext = document.getElementById("btnBankNext");
+
+  elBtnAlternates = document.getElementById("btnAlternates");
+  elAlternatesModal = document.getElementById("alternatesModal");
+  elAlternatesList = document.getElementById("alternatesList");
+  elBtnUndo = document.getElementById("btnUndo");
+
+  elBtnHelp = document.getElementById("btnHelp");
+  elHelpModal = document.getElementById("helpModal");
+
+  elBtnExport = document.getElementById("btnExport");
+  elBtnImport = document.getElementById("btnImport");
+  elFileInput = document.getElementById("fileInput");
+
+  elPromptModal = document.getElementById("promptModal");
+  elPromptInput = document.getElementById("promptInput");
+  elPromptOk = document.getElementById("promptOk");
+}
+
+function onReady(callback) {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", callback, { once: true });
+  } else {
+    callback();
+  }
+}
+
+function initApp() {
+  cacheDomRefs();
+
+  const btnPlus = document.getElementById("btnPlus");
+  if (btnPlus) {
+    btnPlus.addEventListener("click", () => {
+      if (octaves < MAX_OCTAVES) {
+        octaves += 1;
+        applyResponsiveSizing();
+        rebuild();
+      }
+    });
+  }
+
+  const btnMinus = document.getElementById("btnMinus");
+  if (btnMinus) {
+    btnMinus.addEventListener("click", () => {
+      if (octaves > MIN_OCTAVES) {
+        octaves -= 1;
+        applyResponsiveSizing();
+        rebuild();
+      }
+    });
+  }
+
+  const btnUp = document.getElementById("btnUp");
+  if (btnUp) btnUp.addEventListener("click", () => transposeSelection(+1));
+
+  const btnDown = document.getElementById("btnDown");
+  if (btnDown) btnDown.addEventListener("click", () => transposeSelection(-1));
+
+  const btnClear = document.getElementById("btnClear");
+  if (btnClear) {
+    btnClear.addEventListener("click", () => {
+      selectedMidis.clear();
+      activeSlot = -1;
+      activeBankPc = -1;
+      setChordName("");
+      undoHistory = [];
+      updateUndoButton();
+      updateSelectionUI();
+      updateHint();
+    });
+  }
+
+  if (elBtnUndo) {
+    elBtnUndo.addEventListener("click", undoAlternateChord);
+  }
+
+  if (elBtnMenu) elBtnMenu.addEventListener("click", () => openModal(elMenuModal));
+  if (elBtnMemory) {
+    elBtnMemory.addEventListener("click", () => {
+      syncMemoryModalGrid();
+      openModal(elMemoryModal);
+    });
+  }
+  if (elBtnOpenMemory) {
+    elBtnOpenMemory.addEventListener("click", () => {
+      closeModal(elMenuModal);
+      syncMemoryModalGrid();
+      openModal(elMemoryModal);
+    });
+  }
+  if (elBtnPickScale) {
+    elBtnPickScale.addEventListener("click", () => {
+      closeModal(elMenuModal);
+      syncMemoryModalGrid();
+      openModal(elMemoryModal);
+      if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
+    });
+  }
+  if (elBtnHelp) {
+    elBtnHelp.addEventListener("click", () => {
+      closeModal(elMenuModal);
+      openModal(elHelpModal);
+    });
+  }
+
+  if (elBtnExport) {
+    elBtnExport.addEventListener("click", () => {
+      exportChordBanks();
+    });
+  }
+
+  if (elBtnImport && elFileInput) {
+    elBtnImport.addEventListener("click", () => {
+      elFileInput.click();
+    });
+
+    elFileInput.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result;
+        if (typeof content === "string") {
+          importChordBanks(content);
+        }
+        // Reset input so same file can be imported again
+        elFileInput.value = "";
+      };
+      reader.onerror = () => {
+        if (elStatus) {
+          elStatus.textContent = "Failed to read file";
+          setTimeout(() => {
+            elStatus.textContent = "Offline-ready.";
+          }, 3000);
+        }
+        elFileInput.value = "";
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  if (elPianoScroll) {
+    elPianoScroll.addEventListener("pointermove", (e) => {
+      if (pointerDownPos.x !== 0 || pointerDownPos.y !== 0) {
+        const deltaX = Math.abs(e.clientX - pointerDownPos.x);
+        const deltaY = Math.abs(e.clientY - pointerDownPos.y);
+        // If moved more than 5px, consider it scrolling
+        if (deltaX > 5 || deltaY > 5) {
+          isScrolling = true;
+        }
+      }
+    });
+
+    elPianoScroll.addEventListener("pointerup", () => {
+      pointerDownPos = { x: 0, y: 0 };
+    });
+
+    elPianoScroll.addEventListener("pointercancel", () => {
+      pointerDownPos = { x: 0, y: 0 };
+    });
+  }
+
+  loadState();
+  rebuildScaleSelect();
+  setCurrentScalePc(currentScalePc);
+  updateBankDisplay();
+  renderMemoryButtons();
+  syncMemoryModalGrid();
+  setChordName("");
+
+  applyResponsiveSizing();
+  renderPiano();
+  updateHeader();
+  updateTransposeKeyDisplay();
+  updateHint();
+}
+
+// Cache references once immediately (scripts load after DOM in index.html)
+cacheDomRefs();
+
+onReady(initApp);
 
 const STORAGE_KEY = "pct_state_v1";
-
-let appMode = "free"; // free | chordScale
 
 // Fixed 12 scale banks (C..B)
 let scales = Array.from({ length: 12 }, (_, pc) => pc);
@@ -88,40 +300,7 @@ let activeChordName = "";
 // Undo history stack for alternate chord changes (max 5 steps)
 const MAX_UNDO_STEPS = 5;
 let undoHistory = []; // Array of { midis: Set<number>, name: string }
-
-
-
-document.getElementById("btnPlus").addEventListener("click", () => {
-  if (octaves < MAX_OCTAVES) {
-    octaves += 1;
-    applyResponsiveSizing();
-    rebuild();
-  }
-});
-
-document.getElementById("btnMinus").addEventListener("click", () => {
-  if (octaves > MIN_OCTAVES) {
-    octaves -= 1;
-    applyResponsiveSizing();
-    rebuild();
-  }
-});
-
-// Semitone transpose (±1 MIDI)
-document.getElementById("btnUp").addEventListener("click", () => transposeSelection(+1));
-document.getElementById("btnDown").addEventListener("click", () => transposeSelection(-1));
-
-document.getElementById("btnClear").addEventListener("click", () => {
-  selectedMidis.clear();
-  activeSlot = -1;
-  activeBankPc = -1;
-  setChordName("");
-  undoHistory = [];
-  updateUndoButton();
-  updateSelectionUI();
-  updateHint();
-});
-
+// Removed stray event listener for btnPlus
 // ===== Undo Alternate Chord =====
 function updateUndoButton() {
   if (elBtnUndo) {
@@ -149,14 +328,7 @@ function undoAlternateChord() {
   updateHint();
 }
 
-if (elBtnUndo) {
-  elBtnUndo.addEventListener("click", undoAlternateChord);
-}
-
 // ===== Custom Prompt Modal =====
-const elPromptModal = document.getElementById("promptModal");
-const elPromptInput = document.getElementById("promptInput");
-const elPromptOk = document.getElementById("promptOk");
 
 function customPrompt(message, defaultValue = "") {
   return new Promise((resolve) => {
@@ -243,41 +415,11 @@ document.addEventListener("keydown", (e) => {
   if (elMenuModal && !elMenuModal.hidden) return closeModal(elMenuModal);
 });
 
-if (elBtnMenu) elBtnMenu.addEventListener("click", () => openModal(elMenuModal));
-if (elBtnMemory) {
-  elBtnMemory.addEventListener("click", () => {
-    syncMemoryModalGrid();
-    openModal(elMemoryModal);
-  });
-}
-if (elBtnOpenMemory) {
-  elBtnOpenMemory.addEventListener("click", () => {
-    closeModal(elMenuModal);
-    syncMemoryModalGrid();
-    openModal(elMemoryModal);
-  });
-}
-if (elBtnPickScale) {
-  elBtnPickScale.addEventListener("click", () => {
-    closeModal(elMenuModal);
-    syncMemoryModalGrid();
-    openModal(elMemoryModal);
-    if (elScaleSelect) elScaleSelect.focus({ preventScroll: true });
-  });
-}
-if (elBtnHelp) {
-  elBtnHelp.addEventListener("click", () => {
-    closeModal(elMenuModal);
-    openModal(elHelpModal);
-  });
-}
-
 // ===== Export / Import Chord Banks =====
 function exportChordBanks() {
   const exportData = {
     version: "1.0",
     timestamp: new Date().toISOString(),
-    appMode,
     currentScalePc,
     bankChords: bankChords.map(bank => 
       bank.map(slot => 
@@ -342,10 +484,6 @@ function importChordBanks(fileContent) {
       )
     );
     
-    if (typeof data.appMode === "string" && ["free", "chordScale"].includes(data.appMode)) {
-      setMode(data.appMode);
-    }
-    
     if (typeof data.currentScalePc === "number" && data.currentScalePc >= 0 && data.currentScalePc < 12) {
       currentScalePc = data.currentScalePc;
       updateBankDisplay();
@@ -373,43 +511,6 @@ function importChordBanks(fileContent) {
     }
     return false;
   }
-}
-
-if (elBtnExport) {
-  elBtnExport.addEventListener("click", () => {
-    exportChordBanks();
-  });
-}
-
-if (elBtnImport && elFileInput) {
-  elBtnImport.addEventListener("click", () => {
-    elFileInput.click();
-  });
-  
-  elFileInput.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result;
-      if (typeof content === "string") {
-        importChordBanks(content);
-      }
-      // Reset input so same file can be imported again
-      elFileInput.value = "";
-    };
-    reader.onerror = () => {
-      if (elStatus) {
-        elStatus.textContent = "Failed to read file";
-        setTimeout(() => {
-          elStatus.textContent = "Offline-ready.";
-        }, 3000);
-      }
-      elFileInput.value = "";
-    };
-    reader.readAsText(file);
-  });
 }
 
 // ===== Bank Selector Event Handlers =====
@@ -449,14 +550,10 @@ if (elBtnBankCurrent) {
   });
 }
 
-// ===== Modes =====
+// ===== Scale Context =====
 function updateMemoryMeta() {
   if (!elMemoryMeta) return;
-  if (appMode === "free") {
-    elMemoryMeta.textContent = "Mode: Free";
-  } else {
-    elMemoryMeta.textContent = "Mode: Chord→Scale (" + NOTES_SHARP[currentScalePc] + ")";
-  }
+  elMemoryMeta.textContent = "Bank: " + NOTES_SHARP[currentScalePc];
 }
 
 function romanForPcInMajorKey(rootPc, keyPc) {
@@ -502,8 +599,6 @@ function applyQualityToRoman(roman, suffix) {
 }
 
 function formatChordDisplay(autoName) {
-  // Only add roman numerals in Chord→Scale mode
-  if (appMode !== "chordScale") return autoName;
   const lastDetectedRootPc = getLastDetectedRoot();
   if (lastDetectedRootPc === null) return autoName;
 
@@ -519,38 +614,6 @@ function setChordName(name) {
     elChordNameText.textContent = activeChordName ? ("Chord: " + activeChordName) : "Chord: —";
   }
 }
-
-function setMode(nextMode) {
-  appMode = nextMode;
-  if (elModeFree) elModeFree.classList.toggle("active", appMode === "free");
-  if (elModeChordScale) elModeChordScale.classList.toggle("active", appMode === "chordScale");
-  if (elModeHint) {
-    elModeHint.textContent =
-      appMode === "free"
-        ? "Free Transpose: select any notes and transpose by semitones."
-        : "Chord → Scale: store chords with a key. Slots update as you transpose.";
-  }
-
-  // Hide memory UI in Free mode
-  if (elMemoryCard) elMemoryCard.hidden = (appMode === "free");
-  if (elBankSelector) elBankSelector.style.display = (appMode === "chordScale" ? "flex" : "none");
-  if (appMode === "free" && elMemoryModal && !elMemoryModal.hidden) {
-    closeModal(elMemoryModal);
-  }
-  if (appMode === "free") {
-    activeSlot = -1;
-    activeBankPc = -1;
-    setChordName("");
-  }
-
-  updateMemoryMeta();
-  updateBankDisplay();
-  saveState();
-  renderMemoryButtons();
-}
-
-if (elModeFree) elModeFree.addEventListener("click", () => setMode("free"));
-if (elModeChordScale) elModeChordScale.addEventListener("click", () => setMode("chordScale"));
 
 // ===== Scales =====
 function rebuildScaleSelect() {
@@ -682,8 +745,8 @@ if (elBtnAlternates) {
 
 
 function maybeAutoSetChordName() {
-  // Don't overwrite a loaded slot name in chordScale mode
-  if (appMode === "chordScale" && activeSlot >= 0) {
+  // Don't overwrite a loaded slot name
+  if (activeSlot >= 0) {
     const slot = getSlot(currentScalePc, activeSlot);
     if (slot && slot.name) return;
   }
@@ -806,8 +869,6 @@ function clearSlot(i) {
 
 
 function transposeBanksAndChords(deltaSemitone) {
-  if (appMode !== "chordScale") return;
-
   const { min, max } = rangeMidis();
 
   // Rotate banks and transpose all stored chords by the same semitone amount
@@ -874,11 +935,8 @@ if (elBtnSlotClear) {
 function saveState() {
   try {
     const payload = { 
-      appMode, 
       currentScalePc, 
-      bankChords,
-      memoryCollapsed: elMemoryCard?.classList.contains('collapsed') ?? false,
-      controlsCollapsed: elControls?.classList.contains('collapsed') ?? false
+      bankChords
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -893,7 +951,6 @@ function loadState() {
     const p = JSON.parse(raw);
     if (!p || typeof p !== "object") return;
 
-    if (p.appMode === "free" || p.appMode === "chordScale") appMode = p.appMode;
     if (typeof p.currentScalePc === "number") currentScalePc = normalizePc(p.currentScalePc);
 
     if (Array.isArray(p.bankChords) && p.bankChords.length === 12) {
@@ -913,16 +970,6 @@ function loadState() {
       }
       bankChords = next;
     }
-
-    // Restore collapsed states
-    if (typeof p.memoryCollapsed === 'boolean') {
-      elMemoryCard?.classList.toggle('collapsed', p.memoryCollapsed);
-      document.getElementById('btnToggleMemory')?.setAttribute('aria-expanded', !p.memoryCollapsed);
-    }
-    if (typeof p.controlsCollapsed === 'boolean') {
-      elControls?.classList.toggle('collapsed', p.controlsCollapsed);
-      document.getElementById('btnToggleControls')?.setAttribute('aria-expanded', !p.controlsCollapsed);
-    }
   } catch {
     // ignore
   }
@@ -941,7 +988,7 @@ function transposeSelection(deltaSemitone) {
 
   selectedMidis = next;
 
-  // In Chord→Scale mode, transposing also advances the scale bank and transposes all stored chords.
+  // Transposing also advances the scale bank and keeps stored chords aligned.
   transposeBanksAndChords(deltaSemitone);
 
   updateSelectionUI();
@@ -1036,7 +1083,7 @@ function applyResponsiveSizing() {
 
   // Remaining height budget after topbar + controlBar + footer
   const topH = elTopbar ? elTopbar.offsetHeight : 0;
-  const controlsH = elControls ? elControls.offsetHeight : 0;
+  const controlsH = elCommandDeck ? elCommandDeck.offsetHeight : 0;
   const footerH = elFooter ? elFooter.offsetHeight : 0;
   const safe = 28; // wrap padding + gaps buffer
   const availableH = Math.max(160, window.innerHeight - topH - controlsH - footerH - safe);
@@ -1069,6 +1116,13 @@ let pointerDownPos = { x: 0, y: 0 };
 let isScrolling = false;
 
 function renderPiano() {
+  if (!elPiano) {
+    cacheDomRefs();
+  }
+  if (!elPiano) {
+    console.warn("Piano element missing; render skipped");
+    return;
+  }
   elPiano.innerHTML = "";
 
   // Always render all 88 keys
@@ -1158,28 +1212,11 @@ function renderPiano() {
 }
 
 // Detect scrolling on piano container
-if (elPianoScroll) {
-  elPianoScroll.addEventListener("pointermove", (e) => {
-    if (pointerDownPos.x !== 0 || pointerDownPos.y !== 0) {
-      const deltaX = Math.abs(e.clientX - pointerDownPos.x);
-      const deltaY = Math.abs(e.clientY - pointerDownPos.y);
-      // If moved more than 5px, consider it scrolling
-      if (deltaX > 5 || deltaY > 5) {
-        isScrolling = true;
-      }
-    }
-  });
-
-  elPianoScroll.addEventListener("pointerup", () => {
-    pointerDownPos = { x: 0, y: 0 };
-  });
-
-  elPianoScroll.addEventListener("pointercancel", () => {
-    pointerDownPos = { x: 0, y: 0 };
-  });
-}
-
 function updateSelectionUI() {
+  if (!elPiano) {
+    cacheDomRefs();
+  }
+  if (!elPiano) return;
   const keys = elPiano.querySelectorAll(".key");
   for (const k of keys) {
     const midi = Number(k.dataset.midi);
@@ -1195,6 +1232,7 @@ window.addEventListener("resize", () => {
   updateHint();
 });
 
+
 // Service worker registration
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", async () => {
@@ -1206,40 +1244,3 @@ if ("serviceWorker" in navigator) {
     }
   });
 }
-
-// ===== Section Toggles =====
-const elBtnToggleMemory = document.getElementById("btnToggleMemory");
-const elBtnToggleControls = document.getElementById("btnToggleControls");
-
-if (elBtnToggleMemory) {
-  elBtnToggleMemory.addEventListener("click", () => {
-    const isCollapsed = elMemoryCard.classList.toggle("collapsed");
-    elBtnToggleMemory.setAttribute("aria-expanded", !isCollapsed);
-    saveState();
-  });
-}
-
-if (elBtnToggleControls) {
-  elBtnToggleControls.addEventListener("click", () => {
-    const isCollapsed = elControls.classList.toggle("collapsed");
-    elBtnToggleControls.setAttribute("aria-expanded", !isCollapsed);
-    saveState();
-  });
-}
-
-// Init
-loadState();
-rebuildScaleSelect();
-setMode(appMode);
-setCurrentScalePc(currentScalePc);
-updateBankDisplay();
-renderMemoryButtons();
-syncMemoryModalGrid();
-setChordName("");
-
-applyResponsiveSizing();
-renderPiano();
-updateHeader();
-updateTransposeKeyDisplay();
-updateHint();
-

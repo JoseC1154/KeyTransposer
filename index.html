@@ -26,6 +26,16 @@
         <div class="appname">Piano Chord Transposer</div>
         <div class="subtitle" id="chordNameText">Chord: —</div>
       </div>
+      <div class="hud">
+        <div class="hudRow">
+          <span class="hudLabel">Oct:</span>
+          <span class="hudValue" id="octaveText">—</span>
+        </div>
+        <div class="hudRow">
+          <span class="hudLabel">Sel:</span>
+          <span class="hudValue" id="transposeHint">Select keys</span>
+        </div>
+      </div>
     </div>
   </div>
   <button class="ghost" id="btnClear" type="button">Clear</button>
@@ -33,29 +43,38 @@
 
   <main class="wrap">
 
-    <!-- ===== PIANO ===== -->
-    <section class="pianoCard" aria-label="Piano">
-      <div class="pianoScroll" id="pianoScroll">
-        <div class="piano" id="piano" role="application" aria-label="Interactive piano"></div>
-      </div>
-    </section>
-    <!-- ===== CHORD MEMORY (12 slots) ===== -->
-    <div class="sectionWrapper">
-      <button class="sectionToggle" id="btnToggleMemory" type="button" aria-label="Toggle chord memory" aria-expanded="false">
-        <span class="toggleIcon">◀</span>
-      </button>
-      <section class="memoryCard collapsed" id="memoryCard" aria-label="Chord memory">
-        <div class="memoryHead">
-        <div class="memoryTitle">Chord Memory</div>
-        <div class="memoryMeta" id="memoryMeta">Mode: Free</div>
+      <!-- Piano keyboard container (required by js/main.js) -->
+      <section class="pianoContainer">
+        <div id="pianoScroll" class="pianoScroll">
+          <div id="piano" class="piano" aria-label="Piano keyboard"></div>
+        </div>
+      </section>
+
+      <!-- Calculator-style deck controls placed under piano -->
+      <div id="commandDeck" class="deckControls calculatorDeck">
+        
+
         <div class="bankSelector" id="bankSelector">
           <button class="bankBtn" id="btnBankPrev" type="button" aria-label="Previous scale">◀</button>
           <button class="bankBtn bankCurrent" id="btnBankCurrent" type="button" aria-label="Current scale">C</button>
           <button class="bankBtn" id="btnBankNext" type="button" aria-label="Next scale">▶</button>
         </div>
-        <button class="ghost" id="btnMemory" type="button" aria-haspopup="dialog" aria-controls="memoryModal">Manage</button>
+
+        <div class="transposeCluster" role="group" aria-label="Transpose controls">
+          <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
+          <button class="ctrl mini transposeKey" id="transposeKeyText" type="button" aria-label="Current transpose key">C</button>
+          <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
+        </div>
+
+        <div class="cluster octaveAltCluster">
+          <button class="ctrl mini" id="btnMinus" type="button" aria-label="Remove octave">−</button>
+          <button class="ctrl mini" id="btnPlus" type="button" aria-label="Add octave">+</button>
+          <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
+          <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
+        </div>
       </div>
-      <div class="memoryGrid" id="memoryGrid" role="group" aria-label="12 chord memory slots">
+
+      <div class="memoryStrip" id="memoryGrid" role="group" aria-label="12 chord memory slots">
         <button class="memBtn" type="button" data-slot="0" aria-label="Memory slot 1">1</button>
         <button class="memBtn" type="button" data-slot="1" aria-label="Memory slot 2">2</button>
         <button class="memBtn" type="button" data-slot="2" aria-label="Memory slot 3">3</button>
@@ -69,36 +88,7 @@
         <button class="memBtn" type="button" data-slot="10" aria-label="Memory slot 11">11</button>
         <button class="memBtn" type="button" data-slot="11" aria-label="Memory slot 12">12</button>
       </div>
-      </section>
-    </div>
-
-    <!-- ===== SINGLE-LINE CONTROL BAR (NO SCROLL ON MOBILE) ===== -->
-    <div class="sectionWrapper">
-      <button class="sectionToggle" id="btnToggleControls" type="button" aria-label="Toggle controls" aria-expanded="false">
-        <span class="toggleIcon">◀</span>
-      </button>
-      <section class="controlBar collapsed" id="controls" aria-label="Controls">
-      <button class="ctrl mini" id="btnMinus" type="button" aria-label="Remove octave">−</button>
-      <button class="ctrl mini" id="btnPlus" type="button" aria-label="Add octave">+</button>
-
-      <div class="hud">
-        <div class="hudRow">
-          <span class="hudLabel">Oct:</span>
-          <span class="hudValue" id="octaveText">—</span>
-        </div>
-        <div class="hudRow">
-          <span class="hudLabel">Sel:</span>
-          <span class="hudValue" id="transposeHint">Select keys</span>
-        </div>
-      </div>
-
-      <button class="ctrl mini accent" id="btnDown" type="button" aria-label="Transpose down">▼</button>
-      <button class="ctrl mini transposeKey" id="transposeKeyText" type="button" aria-label="Current transpose key">C</button>
-      <button class="ctrl mini accent" id="btnUp" type="button" aria-label="Transpose up">▲</button>
-      <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
-        <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
-      </section>
-    </div>
+    </section>
 
     <footer class="footer" id="footer">
       <span id="status">Offline-ready.</span>
@@ -115,18 +105,9 @@
       </div>
 
       <div class="modalSection">
-        <div class="modalLabel">Mode</div>
-        <div class="modeRow" role="group" aria-label="App mode">
-          <button class="modeBtn" type="button" id="modeFree" data-mode="free">Free Transpose</button>
-          <button class="modeBtn" type="button" id="modeChordScale" data-mode="chordScale">Chord → Scale</button>
-        </div>
-        <div class="modalHint" id="modeHint">Free Transpose: select any notes and transpose by semitones.</div>
-      </div>
-
-      <div class="modalSection">
         <div class="modalLabel">Scale</div>
         <button class="ghost" type="button" id="btnPickScale">Pick / Manage Scales</button>
-        <div class="modalHint" id="scaleHint">Used for chord memory in Chord → Scale mode.</div>
+        <div class="modalHint" id="scaleHint">Used for choosing which scale bank your chords save into.</div>
       </div>
 
       <div class="modalSection">
@@ -267,17 +248,6 @@
           <br>• Tap a slot to save the current chord
           <br>• Tap again to load a saved chord
           <br>• Open Menu → Chord Memory to manage slots
-        </div>
-      </div>
-
-      <div class="modalSection">
-        <div class="helpSectionTitle">🎼 Two Modes</div>
-        <div class="helpText">
-          <strong>Free Transpose:</strong> Select and transpose any notes freely
-          <br><br><strong>Chord → Scale Mode:</strong> Practice chords through keys
-          <br>• Shows Roman numeral analysis
-          <br>• Chord slots update when you transpose
-          <br>• Perfect for learning chord progressions in different keys
         </div>
       </div>
 
