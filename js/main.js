@@ -8,7 +8,7 @@ const MIN_OCTAVES = 2;
 const MAX_OCTAVES = 7;
 
 // Octaves controls viewport/visible area sizing
-let octaves = 2;
+let octaves = 4;
 
 let selectedMidis = new Set();
 
@@ -20,6 +20,7 @@ let elOctaveText;
 let elStatus;
 let elTransposeKeyText;
 let elTransposeHint;
+let elExportNameText;
 
 let elTopbar;
 let elCommandDeck;
@@ -74,6 +75,7 @@ function cacheDomRefs() {
   elStatus = document.getElementById("status");
   elTransposeKeyText = document.getElementById("transposeKeyText");
   elTransposeHint = document.getElementById("transposeHint");
+  elExportNameText = document.getElementById("exportNameText");
 
   elTopbar = document.getElementById("topbar");
   elCommandDeck = document.getElementById("commandDeck");
@@ -132,26 +134,13 @@ function initApp() {
 
   const btnPlus = document.getElementById("btnPlus");
   if (btnPlus) {
-    btnPlus.addEventListener("click", () => {
-      if (octaves < MAX_OCTAVES) {
-        octaves += 1;
-        applyResponsiveSizing();
-        rebuild();
-      }
-    });
+    btnPlus.addEventListener("click", invertSelectionUp);
   }
 
   const btnMinus = document.getElementById("btnMinus");
   if (btnMinus) {
-    btnMinus.addEventListener("click", () => {
-      if (octaves > MIN_OCTAVES) {
-        octaves -= 1;
-        applyResponsiveSizing();
-        rebuild();
-      }
-    });
+    btnMinus.addEventListener("click", invertSelectionDown);
   }
-
   const btnUp = document.getElementById("btnUp");
   if (btnUp) btnUp.addEventListener("click", () => transposeSelection(+1));
 
@@ -416,10 +405,15 @@ document.addEventListener("keydown", (e) => {
 });
 
 // ===== Export / Import Chord Banks =====
-function exportChordBanks() {
+async function exportChordBanks() {
+  // Ask the user for an export name (optional). Cancel aborts export.
+  const name = await customPrompt("Export name (optional):", "");
+  if (name === null) return false;
+
   const exportData = {
     version: "1.0",
     timestamp: new Date().toISOString(),
+    name: (name || "").trim(),
     currentScalePc,
     bankChords: bankChords.map(bank => 
       bank.map(slot => 
@@ -433,7 +427,11 @@ function exportChordBanks() {
   const url = URL.createObjectURL(dataBlob);
   
   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
-  const filename = `piano-chords-${timestamp}.json`;
+  // Sanitize name for filename
+  const safeName = exportData.name
+    ? exportData.name.replace(/\s+/g, '-').replace(/[^\w-]/g, '').slice(0, 50)
+    : null;
+  const filename = safeName ? `piano-chords-${safeName}-${timestamp}.json` : `piano-chords-${timestamp}.json`;
   
   const link = document.createElement("a");
   link.href = url;
@@ -448,6 +446,18 @@ function exportChordBanks() {
       elStatus.textContent = "Offline-ready.";
     }, 3000);
   }
+  if (elExportNameText) {
+    if (exportData.name) {
+      elExportNameText.hidden = false;
+      elExportNameText.textContent = exportData.name;
+    } else {
+      // If user didn't provide a name, keep HUD label hidden
+      elExportNameText.hidden = true;
+      elExportNameText.textContent = "";
+    }
+  }
+
+  return true;
 }
 
 function importChordBanks(fileContent) {
@@ -498,6 +508,15 @@ function importChordBanks(fileContent) {
       setTimeout(() => {
         elStatus.textContent = "Offline-ready.";
       }, 3000);
+    }
+    if (elExportNameText) {
+      if (data.name) {
+        elExportNameText.hidden = false;
+        elExportNameText.textContent = data.name;
+      } else {
+        elExportNameText.hidden = true;
+        elExportNameText.textContent = "";
+      }
     }
     
     return true;
@@ -611,7 +630,14 @@ function formatChordDisplay(autoName) {
 function setChordName(name) {
   activeChordName = (name || "").trim();
   if (elChordNameText) {
-    elChordNameText.textContent = activeChordName ? ("Chord: " + activeChordName) : "Chord: —";
+    // Don't show chord name if there are no keys selected or no name available
+    if (selectedMidis.size === 0 || !activeChordName) {
+      elChordNameText.hidden = true;
+      elChordNameText.textContent = "";
+    } else {
+      elChordNameText.hidden = false;
+      elChordNameText.textContent = "Chord: " + activeChordName;
+    }
   }
 }
 
@@ -991,6 +1017,34 @@ function transposeSelection(deltaSemitone) {
   // Transposing also advances the scale bank and keeps stored chords aligned.
   transposeBanksAndChords(deltaSemitone);
 
+  updateSelectionUI();
+  updateHint();
+}
+
+// Invert selection upwards: move lowest selected note up one octave
+function invertSelectionUp() {
+  if (selectedMidis.size === 0) return;
+  const { min, max } = rangeMidis();
+  const ordered = [...selectedMidis].sort((a, b) => a - b);
+  const lowest = ordered[0];
+  const next = new Set(selectedMidis);
+  next.delete(lowest);
+  next.add(wrapIntoRange(lowest + 12, min, max));
+  selectedMidis = next;
+  updateSelectionUI();
+  updateHint();
+}
+
+// Invert selection downwards: move highest selected note down one octave
+function invertSelectionDown() {
+  if (selectedMidis.size === 0) return;
+  const { min, max } = rangeMidis();
+  const ordered = [...selectedMidis].sort((a, b) => a - b);
+  const highest = ordered[ordered.length - 1];
+  const next = new Set(selectedMidis);
+  next.delete(highest);
+  next.add(wrapIntoRange(highest - 12, min, max));
+  selectedMidis = next;
   updateSelectionUI();
   updateHint();
 }

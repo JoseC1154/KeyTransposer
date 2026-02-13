@@ -292,10 +292,11 @@ body::before{
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(0,0,0,0.18);
+  padding: 6px 0;
+  border-radius: 0;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent;
 }
 
 .transposeCluster .ctrl{

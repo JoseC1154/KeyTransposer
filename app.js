@@ -8,7 +8,8 @@ const PIANO_END_MIDI = 109; // C8 (exclusive)
 const TOTAL_KEYS = 88;
 
 // Octaves controls viewport/visible area sizing
-let octaves = 2;
+// Octaves controls viewport/visible area sizing
+let octaves = 4;
 
 const MIN_OCTAVES = 2;
 const MAX_OCTAVES = 7;

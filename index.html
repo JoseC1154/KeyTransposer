@@ -28,13 +28,13 @@
       </div>
       <div class="hud">
         <div class="hudRow">
-          <span class="hudLabel">Oct:</span>
-          <span class="hudValue" id="octaveText">—</span>
-        </div>
-        <div class="hudRow">
           <span class="hudLabel">Sel:</span>
           <span class="hudValue" id="transposeHint">Select keys</span>
         </div>
+          <div class="hudRow">
+            <span class="hudLabel">Export:</span>
+            <span class="hudValue" id="exportNameText">—</span>
+          </div>
       </div>
     </div>
   </div>
@@ -67,8 +67,8 @@
         </div>
 
         <div class="cluster octaveAltCluster">
-          <button class="ctrl mini" id="btnMinus" type="button" aria-label="Remove octave">−</button>
-          <button class="ctrl mini" id="btnPlus" type="button" aria-label="Add octave">+</button>
+          <button class="ctrl mini" id="btnPlus" type="button" aria-label="Invert up">↥</button>
+          <button class="ctrl mini" id="btnMinus" type="button" aria-label="Invert down">↧</button>
           <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
           <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
         </div>
