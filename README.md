@@ -227,8 +227,25 @@ http://localhost:8000
 * Fix note letter positioning so the letters sit correctly centered on the key circles.
 * Menu: "Scale" and "Chord Memory" currently route to the same modal — separate these into the correct destinations.
 * Fix logic, check the reasoning for alternate chord "I created an f# maj chord , saved it then used the alternative button and what it suggested was a Db Maj,"
-
----
+* Change  to --key-radius: 2px;--
+* Change .key.selected .noteLabel {
+    opacity: 1;
+    /* transform: translateY(0); */
+}
+*Change to 
+    opacity: 0;
+    transform: translateY(3px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    padding: 2px 2px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.18);
+    /* max-width: 92%; */
+    /* overflow: hidden; */
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  *I want the gap between buttons to be 4px
+  *the transposeCluster and bankSelector buttons don't appear the same.
+  * the memoryGrid button should take up the width of the space.
 
 ## Future Ideas
 
