@@ -222,7 +222,7 @@ test('First chord can be selected and saved from an empty Practice bank, with ca
   const prompt=x.d.getElementById('promptModal');
   slot.click();
   assert.equal(prompt.hidden,false);
-  prompt.querySelector('button[data-close]').dispatchEvent(new x.w.Event('pointerdown',{bubbles:true}));
+  prompt.querySelector('button[data-close]').click();
   await calm();
   assert.equal(prompt.hidden,true);
   assert.equal(x.id('Start').disabled,true);
@@ -688,4 +688,71 @@ test('Practice uses the tapped tempo rather than default BPM', async t => {
   assert.equal(x.id('Feedback').textContent,'On time');
   x.click('Stop');
   assert.equal(x.id('Tempo').disabled,false);
+});
+
+test('An octave-up chord advances the piano guide immediately without moving the scheduled beat', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round('rotate');
+  x.at(3140);
+  const guide=()=>[...x.piano.querySelectorAll('.kt-guide')].map(k=>Number(k.dataset.midi)).sort((a,b)=>a-b);
+  assert.deepEqual(guide(),slots[0].midis);
+  x.send(0xb0,64,127);
+  for (const n of slots[0].midis) x.send(0x90,n+12,90);
+  for (const n of slots[0].midis) x.send(0x80,n+12,64);
+  assert.equal(x.id('Feedback').textContent,'On time');
+  assert.deepEqual(guide(),slots[1].midis);
+  assert.match(x.id('Chord').textContent,/Slot 4 ·/);
+  assert.equal(x.d.querySelector('.kt-beats .target').textContent,'2');
+  assert.equal(x.d.querySelectorAll('.kt-midi-sustain').length,3);
+  x.at(5640);
+  for (const n of slots[1].midis) x.send(0x90,n,90);
+  for (const n of slots[1].midis) x.send(0x80,n,64);
+  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: On time');
+  assert.deepEqual(guide(),slots[2].midis);
+});
+test('Native dialogs dismiss on a backdrop click, not an internal click or drag out', async t => {
+  const x=await setup(t);
+  const fire=(dlg, type, pos)=>dlg.dispatchEvent(new x.w.MouseEvent(type,{
+    button:0,clientX:pos,clientY:pos,bubbles:true,cancelable:true
+  }));
+  const saved=x.w.localStorage.getItem('pct_state_v1');
+  x.click('Midi');
+  const midi=x.id('MidiDialog');
+  x.d.getElementById('slotEdit').click();
+  const btn=x.d.querySelector('#memoryGrid button[data-slot="0"]');
+  for (const [dialog,reopen] of [[midi,()=>x.click('Midi')],[x.d.getElementById('slotEditor'),()=>btn.click()]]) {
+    if (!dialog.open) reopen();
+    dialog.getBoundingClientRect=()=>({top:50,right:200,bottom:200,left:50});
+    for (const [start,end] of [[75,75],[75,20],[20,75]]) {
+      fire(dialog,'pointerdown',start); fire(dialog,'click',end);
+      assert.equal(dialog.open,true);
+    }
+    fire(dialog,'pointerdown',20); fire(dialog,'click',20);
+    assert.equal(dialog.open,false);
+    reopen();
+    assert.equal(dialog.open,true);
+    fire(dialog,'pointerdown',20); fire(dialog,'click',20);
+    assert.equal(dialog.open,false);
+  }
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
+});
+test('Lightbox backdrops close, and clicking outside chord naming cancels that save', async t => {
+  const x=await setup(t,[]);
+  for (const id of ['menuModal','memoryModal','alternatesModal','helpModal']) {
+    const el=x.d.getElementById(id);
+    el.hidden=false;
+    el.querySelector('.modalCard').click();
+    assert.equal(el.hidden,false);
+    el.querySelector('.modalOverlay').click();
+    assert.equal(el.hidden,true);
+  }
+  x.click('Open');
+  for (const n of [60,64,67]) x.tap(n);
+  x.d.querySelector('#memoryGrid button[data-slot="2"]').click();
+  const prompt=x.d.getElementById('promptModal');
+  assert.equal(prompt.hidden,false);
+  prompt.querySelector('.modalOverlay').click();
+  await calm();
+  assert.equal(prompt.hidden,true);
+  assert.equal(JSON.parse(x.w.localStorage.getItem('pct_state_v1')).bankChords[0][2],null);
 });

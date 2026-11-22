@@ -36,9 +36,10 @@ test('Ignore accidental repeat after a graded bar', () => {
   assert.equal(score(p,triad,triad,2020),null);
   assert.equal(score(p,triad,triad,4000).result,'on');
 });
-test('Exact notes and octaves, including extra or missing notes, and excessive spread', () => {
+test('Uniform octave shifts count, but altered voicings, extra notes and excessive spread do not', () => {
   const p = makePlan(0,120,'1');
-  for(const notes of [[60,64],[60,64,67,72],[48,52,55]]) assert.equal(score(p,notes,triad,2000).result,'wrong');
+  for(const notes of [[60,64],[60,64,67,72],[60,67,76],[61,65,68]]) assert.equal(score(p,notes,triad,2000).result,'wrong');
+  for(const notes of [[48,52,55],[72,76,79],[84,88,91]]) assert.equal(score(p,notes,triad,2000).result,'on');
   assert.equal(score(p,[67,60,64],triad,2000,2095).result,'on');
   assert.equal(score(p,triad,triad,2000,2096).result,'wrong');
 });

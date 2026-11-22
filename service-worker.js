@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v18-tap-tempo";
+const CACHE_NAME = "piano-transposer-v19-next-chord-octaves";
 const ASSETS = [
   "./",
   "./index.html",

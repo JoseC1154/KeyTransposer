@@ -384,13 +384,11 @@ function customPrompt(message, defaultValue = "") {
       if (e.target.closest('[data-close="promptModal"]')) handleCancel();
     };
     const cleanup = () => {
-      elPromptModal?.removeEventListener("pointerdown", handleDismiss);
       elPromptModal?.removeEventListener("click", handleDismiss);
       if (elPromptOk) elPromptOk.removeEventListener("click", handleOk);
       if (elPromptInput) elPromptInput.removeEventListener("keydown", handleKeydown);
     };
 
-    elPromptModal?.addEventListener("pointerdown", handleDismiss);
     elPromptModal?.addEventListener("click", handleDismiss);
     if (elPromptOk) elPromptOk.addEventListener("click", handleOk);
     if (elPromptInput) elPromptInput.addEventListener("keydown", handleKeydown);
@@ -398,6 +396,22 @@ function customPrompt(message, defaultValue = "") {
 }
 
 // ===== Modal wiring =====
+function dismissOnBackdrop(dialog, close) {
+  const outside = event => {
+    if (!dialog.open || event.target !== dialog) return false;
+    const rect = dialog.getBoundingClientRect();
+    return event.clientX < rect.left || event.clientX >= rect.right
+      || event.clientY < rect.top || event.clientY >= rect.bottom;
+  };
+  let startedOutside = false;
+  dialog.addEventListener("pointerdown", event => { startedOutside = event.button === 0 && outside(event); });
+  dialog.addEventListener("pointercancel", () => { startedOutside = false; });
+  dialog.addEventListener("click", event => {
+    const dismiss = startedOutside && outside(event);
+    startedOutside = false;
+    if (dismiss) close();
+  });
+}
 function openModal(el) {
   if (!el) return;
   el.hidden = false;
@@ -421,8 +435,8 @@ function closeFromTarget(t) {
   return true;
 }
 
-document.addEventListener("pointerdown", (e) => {
-  if (closeFromTarget(e.target)) return;
+document.addEventListener("click", (e) => {
+  closeFromTarget(e.target.closest?.("[data-close]"));
 });
 
 document.addEventListener("keydown", (e) => {

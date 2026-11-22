@@ -3,7 +3,11 @@
   const NOTE_SPREAD = 95;
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
   const uniqueNotes = notes => [...new Set(notes.filter(n => Number.isInteger(n) && n >= 21 && n <= 108))].sort((a, b) => a - b);
-  const same = (a, b) => a.length === b.length && a.every((n, i) => n === b[i]);
+  function sameVoicing(a, b) {
+    if (!a.length || a.length !== b.length) return false;
+    const shift = a[0] - b[0];
+    return shift % 12 === 0 && a.every((note, i) => note - b[i] === shift);
+  }
   const METERS = {
     "2/4": { count: 2, split: 1, accents: [] },
     "3/4": { count: 3, split: 1, accents: [] },
@@ -29,7 +33,7 @@
     const target = plan.targets.reduce((nearest, t) => Math.abs(first - t.time) < Math.abs(first - nearest.time) ? t : nearest);
     const delta = first - target.time;
     if (target.result || Math.abs(delta) > plan.window) return null;
-    const result = !same(uniqueNotes(notes), target.notes || expected) || last - first > NOTE_SPREAD ? "wrong"
+    const result = !sameVoicing(uniqueNotes(notes), uniqueNotes(target.notes || expected)) || last - first > NOTE_SPREAD ? "wrong"
       : delta < -plan.tolerance ? "early" : delta > plan.tolerance ? "late" : "on";
     return { target, delta, result };
   }
@@ -284,7 +288,7 @@
       key.classList.toggle("kt-midi-sustain", showTail);
       key.classList.toggle("kt-pick", open() && !!playingPicks()?.has(n));
       key.classList.toggle("kt-example", open() && demoNotes.includes(n));
-      key.classList.toggle("kt-guide", roundMode === "practice" && guideNotes.includes(n));
+      key.classList.toggle("kt-guide", roundMode === "practice" && !!guideNotes?.includes(n));
       key.classList.toggle("kt-player", open() && performance.now() < touchUntil && touchNotes.includes(n));
     },
   };
@@ -547,6 +551,18 @@
   function soundChord(notes, when, length) {
     for (const n of notes) tone(440 * 2 ** ((n - 69) / 12), when, length, .21 / notes.length, "triangle");
   }
+  function updatePracticeGuide(plan) {
+    const next = plan.targets.findIndex(t => !t.result);
+    const notes = next < 0 ? null : plan.targets[next].notes;
+    if (guideNotes !== notes) {
+      active.roundPicks.clear();
+      touchNotes = []; touchUntil = 0;
+      guideNotes = notes;
+      paintKeys();
+    }
+    displaySlot(next < 0 ? plan.targets.length - 1 : next);
+    return next;
+  }
   function result(data) {
     const { target, result, delta } = data;
     target.result = result;
@@ -559,6 +575,10 @@
     glowUntil = Math.max(performance.now(), target.time) + 340;
     feedback(label, result);
     renderResults(active.plan);
+    const next = updatePracticeGuide(active.plan);
+    const index = Math.floor((performance.now() - active.plan.start) / active.plan.step);
+    const pulse = index < 0 ? -1 : index % active.plan.count;
+    renderBeats(next < 0 ? -1 : active.plan.targets[next].beat - 1, pulse, false, glowBeat);
     return false;
   }
   function submit(notes, first, last) {
@@ -624,29 +644,13 @@
     const { plan, demo } = active;
     const index = Math.floor((now - plan.start) / plan.step);
     const bar = Math.floor(index / plan.count) - 1;
-    let position = clamp(bar, 0, plan.targets.length - 1);
-    if (!demo) {
-      const unresolved = plan.targets.findIndex(t => !t.result);
-      if (unresolved >= 0) {
-        const next = plan.targets[unresolved];
-        if (now > next.time + plan.window + NOTE_SPREAD + 18) {
-          startRound(false, "Missed", "miss");
-          return;
-        }
-        // A late target near the end of the bar can still be awaiting a score.
-        position = Math.min(position, unresolved);
-      }
+    const position = demo ? clamp(bar, 0, plan.targets.length - 1) : updatePracticeGuide(plan);
+    const state = position < 0 ? null : plan.targets[position];
+    if (demo) displaySlot(position);
+    if (!demo && state && now > state.time + plan.window + NOTE_SPREAD + 18) {
+      startRound(false, "Missed", "miss");
+      return;
     }
-    const state = plan.targets[position];
-    if (!demo && guideNotes !== state.notes) {
-      if (guideNotes.length) {
-        active.roundPicks.clear();
-        touchNotes = []; touchUntil = 0;
-      }
-      guideNotes = state.notes;
-      paintKeys();
-    }
-    displaySlot(position);
     const pulse = index >= 0 && index < (plan.targets.length + 1) * plan.count ? index % plan.count : -1;
     if (index >= plan.count && !active.go) {
       active.go = true;
@@ -658,7 +662,7 @@
       demoNotes = highlighted;
       paintKeys();
     }
-    renderBeats(state.beat - 1, pulse, showingDemo, now < glowUntil ? glowBeat : -1);
+    renderBeats(state ? state.beat - 1 : -1, pulse, showingDemo, now < glowUntil ? glowBeat : -1);
     if (now >= plan.end) {
       const good = plan.targets.filter(t => t.result === "on").length;
       stop(demo ? "Ready to try?" : good + " of " + plan.targets.length + " on time");
@@ -793,6 +797,7 @@
     if (active || launchPending) stop("Stopped");
     dialog.showModal();
   });
+  dismissOnBackdrop(dialog, () => dialog.close());
   $("Connect").addEventListener("click", connect);
   $("Disconnect").addEventListener("click", disconnect);
   $("Port").addEventListener("change", () => { desired = $("Port").value; failedPort = null; refreshPorts(); });

@@ -89,7 +89,7 @@
   $("slotEditorClose").addEventListener("click", () => close());
   $("slotEditorBack").addEventListener("click", () => { resetForm(); update(); actions.querySelector("button:enabled")?.focus(); });
   dialog.addEventListener("cancel", e => { e.preventDefault(); close(); });
-  dialog.addEventListener("click", e => { if (e.target === dialog) close(); });
+  dismissOnBackdrop(dialog, close);
   actions.addEventListener("click", e => {
     const button = e.target.closest("[data-slot-action]");
     if (!button || button.disabled || !current) return;
