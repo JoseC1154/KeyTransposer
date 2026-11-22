@@ -27,14 +27,14 @@ async function setup(t, entries = slots) {
   w.HTMLDialogElement.prototype.showModal = function(){ this.setAttribute('open',''); };
   w.HTMLDialogElement.prototype.close = function(){ this.removeAttribute('open'); };
   t.after(() => { w.close(); assert.deepEqual(errors, []); });
-  let clock = 1000, frames = new Map(), frameId = 0, played = [];
+  let clock = 1000, frames = new Map(), frameId = 0, played = [], audioClock = 3;
   Object.defineProperty(w.performance,'now',{value:()=> clock});
   w.requestAnimationFrame = f => { frames.set(++frameId, f); return frameId; };
   w.cancelAnimationFrame = n => frames.delete(n);
   Object.defineProperty(w,'isSecureContext',{value:true});
   class Audio {
     state = 'running';
-    currentTime = 3;
+    get currentTime() { return audioClock; }
     createGain() { return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}}; }
     createOscillator() {
       return {frequency:{value:0},connect(){},disconnect(){},end:Infinity,
@@ -59,7 +59,7 @@ async function setup(t, entries = slots) {
   const send = (status,note,velocity,time=clock) => port.onmidimessage({ data:[status,note,velocity], timeStamp:time });
   const midi = async () => { click('Midi'); click('Connect'); await calm(); id('MidiDialog').close(); };
   const round = async (beat='1') => { set('Tempo','120'); set('Target',beat); click('Start'); await calm(); };
-  return {w,d,piano,tap,usb,port,id,set,click,at,send,midi,round,played,asked:()=>asked,pending:p=>{pending=p;}};
+  return {w,d,piano,tap,setAudio:time=>{audioClock=time;},usb,port,id,set,click,at,send,midi,round,played,asked:()=>asked,pending:p=>{pending=p;}};
 }
 test('Shows the demo in amber on beat 2; stopping clears scheduled sound and restores transposer', async t => {
   const x = await setup(t);
@@ -324,4 +324,39 @@ test('Practice selections can be saved in Edit; Clear requires confirmation', as
   e.submit();
   assert.equal(e.saved(1),null);
   assert.equal(x.id('Start').disabled,true);
+});
+
+test('Standalone click works in an empty bank, accents the meter, and cancels scheduled audio', async t => {
+  const x=await setup(t,[]);
+  x.click('Open'); x.set('Meter','3/4'); x.set('Tempo','120');
+  assert.equal(x.id('Start').disabled,true);
+  x.click('Click'); await calm();
+  assert.equal(x.id('Click').getAttribute('aria-pressed'),'true');
+  assert.equal(x.id('Click').textContent,'Stop click');
+  assert.equal(x.played.length,1);
+  assert.equal(x.played[0].frequency.value,1400);
+  for(const [time,at] of [[3.5,1500],[4,2000],[4.5,2500]]) {
+    x.setAudio(time); x.at(at);
+  }
+  assert.deepEqual(x.played.map(n=>n.frequency.value),[1400,900,900,1400]);
+  x.at(2641);
+  assert.equal(x.d.querySelector('.kt-beats .pulse').textContent,'1');
+  assert.equal(x.id('Results').children.length,0);
+  x.click('Click');
+  assert.equal(x.played.every(o=>o.end===0),true);
+  assert.equal(x.id('Click').textContent,'Metronome');
+  assert.equal(x.id('Meter').disabled,false);
+});
+test('Listening does not burst after a delayed frame and closing Practice stops it', async t => {
+  const x=await setup(t);
+  x.click('Open'); x.set('Tempo','120'); x.click('Click'); await calm();
+  x.setAudio(8.08); x.at(6080);
+  const last=x.played.at(-1);
+  assert.equal(x.played.length,2);
+  assert.ok(last.at>=8.08);
+  x.click('Open');
+  assert.equal(x.played.every(o=>o.end===0),true);
+  assert.equal(x.id('Practice').hidden,true);
+  x.click('Open'); await x.round();
+  assert.equal(x.id('Click').disabled,true);
 });

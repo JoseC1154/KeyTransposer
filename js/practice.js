@@ -193,6 +193,9 @@
     for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = false;
     $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
+    $("Click").disabled = false;
+    $("Click").setAttribute("aria-pressed", "false");
+    $("Click").textContent = "Metronome";
     refreshIdle();
     syncHeld();
     if (message) feedback(message);
@@ -245,6 +248,65 @@
     osc.onended = () => { audioNodes.delete(osc); osc.disconnect(); gain.disconnect(); };
     osc.start(when); osc.stop(when + duration + .01);
   }
+  function scheduleClick(plan, index, when) {
+    const position = index % plan.count;
+    const accent = plan.accents.includes(position);
+    tone(position === 0 ? 1400 : accent ? 1150 : 900, when, .055,
+      position === 0 ? .28 : accent ? .22 : .17, "triangle");
+  }
+  function clocks() {
+    const audioStart = audio.currentTime + .14;
+    const out = audio.getOutputTimestamp?.();
+    const offset = out?.performanceTime > 0 ? out.performanceTime + (audioStart - out.contextTime) * 1000 - performance.now() : 140;
+    const start = performance.now() + (offset > 0 && offset < 500 ? offset : 140);
+    return { audioStart, start };
+  }
+  function practiceTempo() {
+    const bpm = clamp(Math.round(Number($("Tempo").value) || 72), 40, 160);
+    $("Tempo").value = bpm;
+    return bpm;
+  }
+  async function listen() {
+    if (active?.listen || $("Click").getAttribute("aria-pressed") === "true") {
+      stop("Metronome stopped");
+      return;
+    }
+    if (active || launchPending) return;
+    const token = ++runId;
+    launchPending = true;
+    $("Demo").disabled = $("Start").disabled = true;
+    $("Click").setAttribute("aria-pressed", "true");
+    $("Click").textContent = "Stop click";
+    for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = true;
+    try {
+      await unlockAudio();
+      if (token !== runId || !open()) return;
+      stopSound();
+      const bpm = practiceTempo();
+      const { audioStart, start } = clocks();
+      const plan = makePlan(start, bpm, "1", 1, $("Meter").value);
+      active = { listen:true, plan, audioStart, nextClick:0 };
+      feedback("Metronome on");
+      tick();
+    } catch {
+      if (token === runId) stop("Audio unavailable. Try Metronome again.");
+    } finally {
+      if (token === runId) launchPending = false;
+    }
+  }
+  function tickClick(session, now) {
+    const {plan, audioStart} = session;
+    const index = Math.floor((now - plan.start) / plan.step);
+    renderBeats(0, index >= 0 ? index % plan.count : -1);
+    // Queue ahead on the audio clock; never play a burst of missed clicks after a stalled frame.
+    const elapsed = (audio.currentTime - audioStart) * 1000;
+    session.nextClick = Math.max(session.nextClick, Math.ceil(elapsed / plan.step));
+    const horizon = elapsed + 230;
+    while (session.nextClick * plan.step < horizon) {
+      const n = session.nextClick++;
+      scheduleClick(plan, n, audioStart + n * plan.step / 1000);
+    }
+  }
   function soundChord(notes, when, length) {
     for (const n of notes) tone(440 * 2 ** ((n - 69) / 12), when, length, .21 / notes.length, "triangle");
   }
@@ -259,7 +321,7 @@
     renderResults(active.plan);
   }
   function submit(notes, first, last) {
-    if (!active || active.demo) return;
+    if (!active || active.demo || active.listen) return;
     const scored = score(active.plan, notes, [], first, last);
     if (scored) result(scored);
     else if (first >= active.plan.start + (active.plan.count - .5) * active.plan.step && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
@@ -286,7 +348,7 @@
     if (held.has(msg.key) || document.hidden || dialog.open) return;
     held.set(msg.key, msg.note);
     syncHeld();
-    if (!active || active.demo || waitRelease) return;
+    if (!active || active.demo || active.listen || waitRelease) return;
     if (attempt && clock - attempt.first > NOTE_SPREAD) {
       flushAttempt();
       waitRelease = true;
@@ -304,8 +366,13 @@
   }
   function tick() {
     if (!active) return;
-    const { plan, demo } = active;
     const now = performance.now();
+    if (active.listen) {
+      tickClick(active, now);
+      frame = requestAnimationFrame(tick);
+      return;
+    }
+    const { plan, demo } = active;
     const index = Math.floor((now - plan.start) / plan.step);
     const bar = Math.floor(index / plan.count) - 1;
     const position = clamp(bar, 0, plan.targets.length - 1);
@@ -345,27 +412,23 @@
     const token = ++runId;
     launchPending = true;
     lockExistingControls();
+    $("Click").disabled = true;
     $("Demo").disabled = $("Start").disabled = true;
     $("Stop").hidden = false;
     try {
       await unlockAudio();
       if (token !== runId || !open()) return;
-      const bpm = clamp(Math.round(Number($("Tempo").value) || 72), 40, 160);
-      $("Tempo").value = bpm;
+      const bpm = practiceTempo();
       for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = true;
       resetAttempt();
       stopSound();
-      const audioStart = audio.currentTime + .14;
-      const out = audio.getOutputTimestamp?.();
-      const offset = out?.performanceTime > 0 ? out.performanceTime + (audioStart - out.contextTime) * 1000 - performance.now() : 140;
-      const start = performance.now() + (offset > 0 && offset < 500 ? offset : 140);
+      const { audioStart, start } = clocks();
       const plan = makePlan(start, bpm, hitMode(), sequence.length, $("Meter").value);
       plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
       active = { demo, plan, go: false };
       renderResults(demo ? null : plan);
       for (let i = 0; i < (plan.targets.length + 1) * plan.count; i++) {
-        const position = i % plan.count, accent = plan.accents.includes(position);
-        tone(position === 0 ? 1400 : accent ? 1150 : 900, audioStart + i * plan.step / 1000, .045, position === 0 ? .14 : accent ? .11 : .08);
+        scheduleClick(plan, i, audioStart + i * plan.step / 1000);
       }
       if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
       feedback("Count in · 1 bar");
@@ -399,7 +462,7 @@
     if (next === port && port) return;
     const previous = port;
     detach();
-    if (previous && active && !active.demo) stop("MIDI input changed");
+    if (previous && active && !active.demo && !active.listen) stop("MIDI input changed");
     if (!next || next === failedPort) {
       announceMidi(next ? "Could not open input. Reconnect to try again." : desired ? "Input disconnected" : "No MIDI keyboard found");
       return;
@@ -424,7 +487,7 @@
     midiEpoch++;
     if (access) access.onstatechange = null;
     access = null; desired = ""; failedPort = null;
-    if (active && !active.demo) stop("MIDI disconnected");
+    if (active && !active.demo && !active.listen) stop("MIDI disconnected");
     detach();
     $("PortLabel").hidden = $("Disconnect").hidden = true;
     $("Connect").disabled = false;
@@ -465,6 +528,7 @@
     if (open()) window.KTPractice.slotLoaded(notes);
     else api.capture(notes);
   });
+  $("Click").addEventListener("click", listen);
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));
   $("Stop").addEventListener("click", () => stop("Stopped"));
