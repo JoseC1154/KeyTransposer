@@ -464,11 +464,45 @@
     const start = performance.now() + (offset > 0 && offset < 500 ? offset : 140);
     return { audioStart, start };
   }
-  function practiceTempo() {
-    const bpm = clamp(Math.round(Number($("Tempo").value) || 72), 40, 160);
-    $("Tempo").value = bpm;
+  let lastTap = null;
+  let tapIntervals = [];
+  function resetTempoTaps() {
+    lastTap = null;
+    tapIntervals = [];
+  }
+  function setTempo(value) {
+    const bpm = clamp(Math.round(Number(value) || 72), 40, 160);
+    const button = $("Tempo");
+    button.value = bpm;
+    button.textContent = "Tap · " + bpm;
+    button.setAttribute("aria-label", "Tap tempo, " + bpm + " BPM");
     return bpm;
   }
+  function practiceTempo() {
+    resetTempoTaps();
+    return setTempo($("Tempo").value);
+  }
+  $("Tempo").addEventListener("click", () => {
+    const now = performance.now();
+    const gap = lastTap === null ? Infinity : now - lastTap;
+    if (gap < 200) return; // Ignore bounce without shifting the actual beat.
+    lastTap = now;
+    if (gap > 2000) {
+      tapIntervals = [];
+      return;
+    }
+    tapIntervals.push(gap);
+    if (tapIntervals.length > 5) tapIntervals.shift();
+    const ordered = [...tapIntervals].sort((a, b) => a - b);
+    const median = (ordered[Math.floor((ordered.length - 1) / 2)] + ordered[Math.floor(ordered.length / 2)]) / 2;
+    setTempo(60000 / median);
+  });
+  $("Tempo").addEventListener("keydown", event => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    resetTempoTaps();
+    setTempo(Number($("Tempo").value) + (event.key === "ArrowUp" ? 1 : -1));
+  });
   async function listen() {
     if (active?.listen || $("Click").getAttribute("aria-pressed") === "true") {
       stop("Metronome stopped");
@@ -793,7 +827,7 @@
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));
   $("Stop").addEventListener("click", () => stop("Stopped"));
-  $("Meter").addEventListener("change", () => { refreshMeter(); renderResults(); });
+  $("Meter").addEventListener("change", () => { resetTempoTaps(); refreshMeter(); renderResults(); });
   $("Target").addEventListener("change", () => { refreshIdle(); renderResults(); });
   $("Play").addEventListener("click", async event => {
     const notes = uniqueNotes([...(playingPicks() || [])]);

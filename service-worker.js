@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v17-skip-practice-slots";
+const CACHE_NAME = "piano-transposer-v18-tap-tempo";
 const ASSETS = [
   "./",
   "./index.html",

@@ -657,3 +657,35 @@ test('Practice exclusions are scoped by bank and all skipped disables run button
   x.click('Open');
   assert.equal(x.d.querySelectorAll('#memoryGrid .kt-skipped').length,2);
 });
+
+test('Tap Tempo uses steady taps, ignores bounce, and resets after a pause', async t => {
+  const x=await setup(t);
+  x.click('Open');
+  const tempo=x.id('Tempo');
+  for (const time of [1000,1500,1540,2000,2500]) {
+    x.at(time); x.click('Tempo');
+  }
+  assert.equal(tempo.value,'120');
+  assert.equal(tempo.textContent,'Tap · 120');
+  x.at(5090); x.click('Tempo');
+  assert.equal(tempo.value,'120');
+  x.at(5757); x.click('Tempo');
+  assert.equal(tempo.value,'90');
+  tempo.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));
+  assert.equal(tempo.value,'89');
+});
+test('Practice uses the tapped tempo rather than default BPM', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi();
+  for (const time of [1000,1500,2000]) {
+    x.at(time); x.click('Tempo');
+  }
+  x.click('Start'); await calm();
+  assert.equal(x.id('Tempo').disabled,true);
+  x.at(4140);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  assert.equal(x.id('Feedback').textContent,'On time');
+  x.click('Stop');
+  assert.equal(x.id('Tempo').disabled,false);
+});
