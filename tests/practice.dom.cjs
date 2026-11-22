@@ -594,3 +594,66 @@ test('An early or late attempt restarts without advancing to a new target', asyn
     assert.equal(x.piano.querySelectorAll('.kt-guide').length,0);
   }
 });
+
+function dragMemory(x, element, dy, end = 'pointerup') {
+  const fire = (type, y) => {
+    const event = new x.w.MouseEvent(type,{bubbles:true,button:0,clientX:20,clientY:y,detail:1});
+    Object.defineProperty(event,'pointerId',{value:42});
+    element.dispatchEvent(event);
+  };
+  fire('pointerdown',60);
+  fire('pointermove',60+dy);
+  assert.equal(element.classList.contains('kt-slot-drag'),true);
+  assert.match(element.style.getPropertyValue('--kt-slot-y'),/px$/);
+  fire(end,60+dy);
+  assert.equal(element.classList.contains('kt-slot-drag'),false);
+  if (end==='pointerup') element.dispatchEvent(new x.w.MouseEvent('click',{bubbles:true,detail:1}));
+}
+test('Downward drag marks a filled slot skipped without loading it or changing memory; upward drag restores its place', async t => {
+  const x=await setup(t);
+  const btn=x.d.querySelector('#memoryGrid [data-slot="3"]');
+  const contents=x.w.localStorage.getItem('pct_state_v1');
+  x.click('Open');
+  dragMemory(x,btn,13);
+  assert.equal(btn.classList.contains('kt-skipped'),false);
+  assert.equal(x.w.KTTransposer.selection().notes.length,0);
+  dragMemory(x,btn,40,'pointercancel');
+  assert.equal(btn.classList.contains('kt-skipped'),false);
+  dragMemory(x,btn,40);
+  assert.equal(btn.classList.contains('kt-skipped'),true);
+  assert.match(btn.getAttribute('aria-label'),/skipped/);
+  assert.equal(x.w.KTTransposer.selection().notes.length,0);
+  x.set('Tempo','120'); x.click('Demo'); await calm();
+  x.at(5140);
+  assert.match(x.id('Chord').textContent,/Slot 11 ·/);
+  x.click('Stop');
+  await x.round();
+  assert.deepEqual([...x.id('Results').children].map(el=>el.textContent),['1','11']);
+  x.click('Stop');
+  dragMemory(x,btn,-40);
+  assert.equal(btn.classList.contains('kt-skipped'),false);
+  await x.round();
+  assert.deepEqual([...x.id('Results').children].map(el=>el.textContent),['1','4','11']);
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),contents);
+});
+test('Practice exclusions are scoped by bank and all skipped disables run buttons until restored', async t => {
+  const x=await setup(t);
+  const key=(slot,name)=>x.d.querySelector('#memoryGrid [data-slot="'+(slot-1)+'"]').dispatchEvent(
+    new x.w.KeyboardEvent('keydown',{key:name,bubbles:true,cancelable:true}));
+  x.click('Open');
+  for (const {slot} of slots) key(slot,'ArrowDown');
+  assert.equal(x.id('Start').disabled,true);
+  assert.equal(x.id('Demo').disabled,true);
+  assert.equal(x.d.querySelectorAll('#memoryGrid .kt-skipped').length,3);
+  x.d.getElementById('btnBankNext').click();
+  assert.equal(x.d.querySelectorAll('#memoryGrid .kt-skipped').length,0);
+  assert.equal(x.id('Start').disabled,false);
+  x.d.getElementById('btnBankPrev').click();
+  assert.equal(x.d.querySelectorAll('#memoryGrid .kt-skipped').length,3);
+  key(4,'ArrowUp');
+  assert.equal(x.id('Start').disabled,false);
+  x.click('Open');
+  assert.equal(x.d.querySelectorAll('#memoryGrid .kt-skipped').length,0);
+  x.click('Open');
+  assert.equal(x.d.querySelectorAll('#memoryGrid .kt-skipped').length,2);
+});

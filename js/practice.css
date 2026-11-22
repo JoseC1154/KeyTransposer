@@ -3,6 +3,30 @@
 .kt-actions button { white-space: nowrap; }
 #ktCapture:disabled { display: none; }
 body.kt-running-round #memoryGrid .memBtn.active { box-shadow: none; }
+body.kt-practicing:not(.kt-running-round) #memoryGrid:not(.is-editing) .memBtn.filled {
+  touch-action: pan-x;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: translate .18s ease-out, color .15s ease, background .15s ease, border-color .15s ease;
+}
+#memoryGrid .memBtn.kt-skipped {
+  translate: 0 5px;
+  background: #462027;
+  border-color: #ed6576;
+  color: #ffb4bf;
+  box-shadow: none;
+}
+#memoryGrid:not(.is-editing) .memBtn.kt-slot-drag {
+  position: relative;
+  z-index: 1;
+  translate: 0 var(--kt-slot-y, 0);
+  transition: background .1s ease, border-color .1s ease;
+  background: #592934;
+  border-color: #ed6576;
+}
+@media (prefers-reduced-motion: reduce) {
+  body.kt-practicing:not(.kt-running-round) #memoryGrid:not(.is-editing) .memBtn.filled { transition: none; }
+}
 #ktOpen[aria-expanded="true"] { border-color: rgba(29,185,84,.55); background: rgba(29,185,84,.15); }
 .kt-slot-label { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 #ktChord, #ktNext { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

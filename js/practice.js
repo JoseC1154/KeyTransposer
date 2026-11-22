@@ -159,6 +159,86 @@
   }
   const lockedControls = new Set();
   const open = () => !practice.hidden;
+  const memoryGrid = document.getElementById("memoryGrid");
+  const skippedBanks = new Map();
+  let drag = null, suppressClick = null;
+  const canSkip = () => open() && !active && !launchPending && !memoryGrid.classList.contains("is-editing");
+  const skipSet = () => skippedBanks.get(api.bank());
+  const memoryButton = event => event.target.closest?.("button.memBtn[data-slot]");
+  function paintSkipped(chords = api.chords()) {
+    const skipped = skipSet();
+    for (const button of memoryGrid.querySelectorAll(".memBtn")) {
+      const index = Number(button.dataset.slot), slot = index + 1;
+      const eligible = open() && !!chords[index];
+      const off = eligible && (skipped?.has(slot) ?? false);
+      button.classList.toggle("kt-skipped", off);
+      button.setAttribute("aria-label", "Memory slot " + slot + (off ? ", skipped in practice" : ""));
+      if (eligible) button.setAttribute("aria-keyshortcuts", "ArrowDown ArrowUp");
+      else button.removeAttribute("aria-keyshortcuts");
+    }
+  }
+  function setSkipped(button, off) {
+    if (!canSkip() || !button.classList.contains("filled")) return;
+    const slot = Number(button.dataset.slot) + 1;
+    let bank = skipSet();
+    if (off === !!bank?.has(slot)) return;
+    if (off) {
+      if (!bank) skippedBanks.set(api.bank(), bank = new Set());
+      bank.add(slot);
+    } else bank.delete(slot);
+    refreshBank();
+    if (sequence.length) feedback("Slot " + slot + (off ? " skipped" : " included"));
+  }
+  function endSlotDrag(event, canceled = false) {
+    if (!drag || drag.id !== event.pointerId) return;
+    const { button, y, bank, skipped, moved } = drag;
+    drag = null;
+    button.classList.remove("kt-slot-drag");
+    button.style.removeProperty("--kt-slot-y");
+    if (!moved || canceled) return;
+    suppressClick = button;
+    if (canSkip() && bank === api.bank()) {
+      const dy = event.clientY - y;
+      if (!skipped && dy >= 24) setSkipped(button, true);
+      if (skipped && dy <= -24) setSkipped(button, false);
+    }
+  }
+  memoryGrid.addEventListener("pointerdown", event => {
+    const button = memoryButton(event);
+    if (drag || event.isPrimary === false || event.button !== 0) return;
+    suppressClick = null;
+    if (!canSkip() || !button?.classList.contains("filled")) return;
+    drag = { id: event.pointerId, button, y: event.clientY, x: event.clientX,
+      bank: api.bank(), skipped: button.classList.contains("kt-skipped"), moved: false };
+    button.setPointerCapture?.(event.pointerId);
+  });
+  memoryGrid.addEventListener("pointermove", event => {
+    if (!drag || drag.id !== event.pointerId) return;
+    const dy = event.clientY - drag.y, dx = event.clientX - drag.x;
+    if (!drag.moved && Math.abs(dy) > 8 && Math.abs(dy) >= Math.abs(dx)) drag.moved = true;
+    if (!drag.moved) return;
+    drag.button.classList.add("kt-slot-drag");
+    drag.button.style.setProperty("--kt-slot-y", (drag.skipped ? clamp(dy + 5, -20, 8) : clamp(dy, 0, 26)) + "px");
+  });
+  memoryGrid.addEventListener("pointerup", event => endSlotDrag(event));
+  for (const name of ["pointercancel", "lostpointercapture"]) {
+    memoryGrid.addEventListener(name, event => endSlotDrag(event, true));
+  }
+  memoryGrid.addEventListener("click", event => {
+    if (!suppressClick || event.detail === 0) return;
+    const button = suppressClick;
+    suppressClick = null;
+    if (memoryButton(event) === button) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+  memoryGrid.addEventListener("keydown", event => {
+    const button = memoryButton(event);
+    if (!canSkip() || !button?.classList.contains("filled") || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
+    event.preventDefault();
+    setSkipped(button, event.key === "ArrowDown");
+  });
   const hitMode = () => $("Target").value;
   const heldNotes = () => [...new Set(held.values())];
   const midiHeld = n => heldNotes().includes(n);
@@ -322,19 +402,25 @@
     practice.hidden = true;
     $("Open").setAttribute("aria-expanded", "false");
     document.body.classList.remove("kt-practicing");
+    paintSkipped();
     syncHeld();
     $("Open").focus({ preventScroll: true });
   }
   function refreshBank() {
     if (!open() || active || launchPending) return;
-    const next = api.chords().filter(Boolean).map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
+    const chords = api.chords();
+    const skipped = skipSet();
+    if (skipped) for (const slot of skipped) if (!chords[slot - 1]) skipped.delete(slot);
+    paintSkipped(chords);
+    const next = chords.filter(c => c && !skipped?.has(c.slot))
+      .map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
     if (JSON.stringify(next) === JSON.stringify(sequence) && displayed >= 0) return;
     sequence = next;
     displayed = -1;
     displaySlot(0);
     renderResults();
     $("Demo").disabled = $("Start").disabled = !sequence.length;
-    feedback(sequence.length ? "Choose Example or Start" : "Save a chord in a memory slot first.");
+    feedback(sequence.length ? "Choose Example or Start" : skipped?.size ? "Drag a red slot up to include it." : "Save a chord in a memory slot first.");
     paintKeys();
   }
   window.KTPractice.bankChanged = refreshBank;

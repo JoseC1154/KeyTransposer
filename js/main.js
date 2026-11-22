@@ -1386,6 +1386,7 @@ window.KTChordMemory = {
 
 window.KTTransposer = {
   setMidiLayout,
+  bank: () => currentScalePc,
   selection: () => ({ notes: [...selectedMidis], name: activeChordName }),
   chords: () => bankChords[currentScalePc].map((slot, i) => slot && ({ notes: slot.midis.slice(), name: slot.name, slot: i + 1 })),
   capture(notes) {
