@@ -153,7 +153,7 @@ All requested improvements have been implemented:
 * 12 scale banks
 * 12 chord slots per bank
 * Chords stored with their associated scale
-* Slots update correctly when transposing
+* Transpose changes only the working notes; saved slots and the active scale bank stay unchanged.
 
 ### Alternate Chords
 

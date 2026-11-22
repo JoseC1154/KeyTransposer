@@ -29,7 +29,7 @@
   function update() {
     const chord = get(current);
     $("slotEditorTitle").textContent = label(current);
-    $("slotEditorCurrent").textContent = chord ? chord.name || "Unnamed chord" : "Empty";
+    $("slotEditorCurrent").textContent = chord ? (chord.name || "Unnamed chord") + " · " + api.noteNames(chord.midis) : "Empty";
     for (const key of ["load", "rename", "copy", "cut", "clear"]) buttons[key].disabled = !chord;
     buttons.save.disabled = !current.notes.length;
     buttons.paste.disabled = !clipboard || (clipboard.kind === "cut" && sameSlot(clipboard.location, current));

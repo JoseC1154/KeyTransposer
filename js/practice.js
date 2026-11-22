@@ -65,10 +65,11 @@
   window.KTPractice = {
     isHeld: midiHeld,
     isOpen: open,
+    hasPickedNotes: () => open() && picked.size > 0,
     notesForSlot() {
       if (!open()) return null;
       const heldPiano = uniqueNotes(heldNotes());
-      return heldPiano.length ? heldPiano : picked.size ? uniqueNotes([...picked]) : null;
+      return picked.size ? uniqueNotes([...picked]) : heldPiano.length ? heldPiano : null;
     },
     beforeSlot() {
       if (active || launchPending) stop("Stopped for chord memory");

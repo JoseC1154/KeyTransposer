@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v11-edit-voicings";
+const CACHE_NAME = "piano-transposer-v12-save-transposed-chord";
 const ASSETS = [
   "./",
   "./index.html",

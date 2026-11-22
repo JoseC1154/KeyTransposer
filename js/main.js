@@ -923,28 +923,6 @@ function clearSlot(i) {
 }
 
 
-function transposeBanksAndChords(deltaSemitone) {
-  const { min, max } = rangeMidis();
-
-  // Rotate banks and transpose all stored chords by the same semitone amount
-  const nextBanks = Array.from({ length: 12 }, () => Array.from({ length: 12 }, () => null));
-  for (let bank = 0; bank < 12; bank++) {
-    const toBank = normalizePc(bank + deltaSemitone);
-    for (let i = 0; i < 12; i++) {
-      const slot = bankChords[bank][i];
-      if (!slot) continue;
-      const midis = (slot.midis || [])
-        .map((m) => wrapIntoRange(m + deltaSemitone, min, max))
-        .sort((a, b) => a - b);
-      nextBanks[toBank][i] = { midis, name: slot.name || "" };
-    }
-  }
-  bankChords = nextBanks;
-
-  // Advance current bank
-  setCurrentScalePc(currentScalePc + deltaSemitone);
-}
-
 if (elMemoryGrid) {
   elMemoryGrid.querySelectorAll(".memBtn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1041,21 +1019,21 @@ function loadState() {
 }
 
 function transposeSelection(deltaSemitone) {
-  if (selectedMidis.size === 0) return;
-
   const { min, max } = rangeMidis();
-  const next = new Set();
-
-  for (const m of selectedMidis) {
-    const shifted = m + deltaSemitone; // true semitone
-    next.add(wrapIntoRange(shifted, min, max));
+  const shift = note => wrapIntoRange(note + deltaSemitone, min, max);
+  const practiceNotes = window.KTPractice?.notesForSlot();
+  if (practiceNotes?.length) {
+    window.KTPractice.slotLoaded(practiceNotes.map(shift));
+    return;
   }
+  if (!selectedMidis.size) return;
 
-  selectedMidis = next;
-
-  // Transposing also advances the scale bank and keeps stored chords aligned.
-  transposeBanksAndChords(deltaSemitone);
-
+  // Transpose the working chord, not the saved library or current bank.
+  selectedMidis = new Set([...selectedMidis].map(shift));
+  activeSlot = activeBankPc = -1;
+  setChordName("");
+  if (window.KTPractice?.isOpen()) window.KTPractice.slotLoaded([...selectedMidis]);
+  renderMemoryButtons();
   updateSelectionUI();
   updateHint();
 }
@@ -1317,7 +1295,7 @@ function updateSelectionUI() {
   const keys = elPiano.querySelectorAll(".key");
   for (const k of keys) {
     const midi = Number(k.dataset.midi);
-    k.classList.toggle("selected", selectedMidis.has(midi));
+    k.classList.toggle("selected", selectedMidis.has(midi) && !window.KTPractice?.hasPickedNotes());
     k.classList.toggle("kt-midi-held", window.KTPractice?.isHeld(midi) ?? false);
     window.KTPractice?.paintKey(k, midi);
   }
@@ -1350,6 +1328,7 @@ window.KTChordMemory = {
   bankName: bank => NOTES_SHARP[bank],
   notesToSave: () => window.KTPractice?.notesForSlot() || [...selectedMidis],
   nameFor: notes => detectChordNameFromMidis(notes) || "",
+  noteNames: notes => notes.map(midiToNote).join(" · "),
   prepareEdit: () => window.KTPractice?.beforeSlot(),
   load(bank, slot) {
     const chord = getSlot(bank, slot);
