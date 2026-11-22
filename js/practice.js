@@ -162,7 +162,7 @@
     $("PianoSoundLabel").hidden = $("SizeLabel").hidden = !port;
     api.setMidiLayout(port ? Number(midiSize.value) : null);
   }
-  let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], guideNotes = [], touchNotes = [], touchUntil = 0;
+  let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, glowSlot = -1, demoNotes = [], guideNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
   // A round has its own touch selection, separate from the loaded/editor chord.
   let roundMode = null;
@@ -175,7 +175,19 @@
   const open = () => !practice.hidden;
   const memoryGrid = document.getElementById("memoryGrid");
   const skippedBanks = new Map();
-  let drag = null, suppressClick = null;
+  let drag = null, suppressClick = null, litSlot = null;
+  function paintPlayingSlot(slot, kind) {
+    const next = slot > 0 ? memoryGrid.querySelector('[data-slot="' + (slot - 1) + '"]') : null;
+    if (litSlot === next && (!next || next.dataset.ktPlaying === kind)) return;
+    if (litSlot) {
+      delete litSlot.dataset.ktPlaying;
+      litSlot.setAttribute("aria-label", "Memory slot " + (Number(litSlot.dataset.slot) + 1));
+    }
+    litSlot = next;
+    if (!next) return;
+    next.dataset.ktPlaying = kind;
+    next.setAttribute("aria-label", "Memory slot " + slot + (kind === "example" ? ", playing example" : ", played correctly"));
+  }
   const canSkip = () => open() && !active && !launchPending && !memoryGrid.classList.contains("is-editing");
   const skipSet = () => skippedBanks.get(api.bank());
   const memoryButton = event => event.target.closest?.("button.memBtn[data-slot]");
@@ -401,7 +413,8 @@
     stopSound();
     resetAttempt();
     demoNotes = []; guideNotes = []; touchNotes = []; touchUntil = 0;
-    glowBeat = -1; glowUntil = 0;
+    glowBeat = -1; glowUntil = 0; glowSlot = -1;
+    paintPlayingSlot(-1);
     for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = false;
     $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
@@ -585,6 +598,8 @@
     const label = result === "on" ? statusText.on
       : "Correct · " + Math.round(Math.abs(delta)) + " ms " + result;
     glowBeat = target.beat - 1;
+    glowSlot = target.slot;
+    paintPlayingSlot(glowSlot, "played");
     glowUntil = Math.max(performance.now(), target.time) + 340;
     feedback(label, "on");
     renderResults(active.plan);
@@ -687,7 +702,9 @@
       demoNotes = highlighted;
       paintKeys();
     }
-    renderBeats(state ? state.beat - 1 : -1, pulse, showingDemo, now < glowUntil ? glowBeat : -1);
+    const lit = now < glowUntil;
+    paintPlayingSlot(demo ? (showingDemo ? state.slot : -1) : lit ? glowSlot : -1, demo ? "example" : "played");
+    renderBeats(state ? state.beat - 1 : -1, pulse, showingDemo, lit ? glowBeat : -1);
     if (now >= plan.end && (demo || !state)) {
       const good = plan.targets.filter(t => t.result === "on").length;
       const label = plan.targets.every(t => t.timing === "on") ? " on time" : " correct";
@@ -700,7 +717,8 @@
     cancelAnimationFrame(frame);
     resetAttempt();
     stopSound();
-    glowBeat = -1; glowUntil = 0;
+    glowBeat = -1; glowUntil = 0; glowSlot = -1;
+    paintPlayingSlot(-1);
     guideNotes = []; demoNotes = []; touchNotes = []; touchUntil = 0;
     const { audioStart, start } = clocks();
     const plan = makePlan(start, practiceTempo(), hitMode(), sequence.length, $("Meter").value);

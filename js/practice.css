@@ -3,6 +3,22 @@
 .kt-actions button { white-space: nowrap; }
 #ktCapture:disabled { display: none; }
 body.kt-running-round #memoryGrid .memBtn.active { box-shadow: none; }
+body.kt-running-round #memoryGrid .memBtn[data-kt-playing] {
+  color: #101c19;
+  border-color: var(--kt-slot-glow);
+  background: var(--kt-slot-glow);
+  box-shadow: 0 0 0 2px var(--kt-slot-glow);
+  animation: kt-slot-hit .25s ease-out;
+}
+#memoryGrid .memBtn[data-kt-playing="example"] { --kt-slot-glow: #ffb557; }
+#memoryGrid .memBtn[data-kt-playing="played"] { --kt-slot-glow: #54debc; }
+@keyframes kt-slot-hit {
+  from { transform: scale(1.08); }
+  to { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.kt-running-round #memoryGrid .memBtn[data-kt-playing] { animation: none; }
+}
 body.kt-practicing:not(.kt-running-round) #memoryGrid:not(.is-editing) .memBtn.filled {
   touch-action: pan-x;
   user-select: none;

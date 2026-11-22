@@ -784,3 +784,27 @@ test('Rolling the right voicing past the next beat does not pass', async t => {
   assert.equal(x.id('Feedback').textContent,'Missed · Count in again');
   assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: pending');
 });
+
+test('Memory slots pulse with Example and the graded chord, not the previewed next chord', async t => {
+  const x=await setup(t);
+  const lit=()=>[...x.d.querySelectorAll('#memoryGrid [data-kt-playing]')].map(el=>[el.dataset.slot,el.dataset.ktPlaying]);
+  x.click('Open'); x.set('Tempo','120'); x.click('Demo'); await calm();
+  assert.deepEqual(lit(),[]);
+  x.at(3140); assert.deepEqual(lit(),[['0','example']]);
+  x.at(3501); assert.deepEqual(lit(),[]);
+  x.at(5140); assert.deepEqual(lit(),[['3','example']]);
+  x.click('Stop'); assert.deepEqual(lit(),[]);
+  await x.midi(); await x.round();
+  x.at(7280);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  assert.match(x.id('Chord').textContent,/Slot 4 ·/);
+  assert.deepEqual(lit(),[['0','played']]);
+  x.at(7621);
+  assert.deepEqual(lit(),[]);
+  x.at(9280);
+  for (const n of slots[1].midis) x.send(0x90,n,90);
+  for (const n of slots[1].midis) x.send(0x80,n,64);
+  assert.deepEqual(lit(),[['3','played']]);
+  x.click('Stop'); assert.deepEqual(lit(),[]);
+});
