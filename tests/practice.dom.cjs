@@ -508,3 +508,44 @@ test('Optional live piano is silent by default, releases with pedal, and disconn
   assert.equal(x.id('PianoSound').checked,false);
   assert.ok(x.played.slice(3).every(o=>o.end<4.1));
 });
+
+test('Example hides a loaded chord and MIDI highlights during count-in, playback and between chords', async t => {
+  const x=await setup(t);
+  await x.midi();
+  x.d.querySelector('#memoryGrid [data-slot="3"]').click();
+  x.click('Open');
+  const saved=x.w.localStorage.getItem('pct_state_v1');
+  const notes=sel=>[...x.piano.querySelectorAll(sel)].map(k=>Number(k.dataset.midi)).sort((a,b)=>a-b);
+  assert.deepEqual(notes('.selected'),slots[1].midis);
+  x.send(0x90,69,90);
+  x.set('Tempo','120'); x.click('Demo');
+  assert.deepEqual(notes('.selected,.kt-pick,.kt-midi-held'),[]);
+  await calm();
+  x.at(3140);
+  assert.deepEqual(notes('.kt-example'),slots[0].midis);
+  assert.deepEqual(notes('.selected,.kt-pick,.kt-midi-held'),[]);
+  x.at(4000);
+  assert.deepEqual(notes('.kt-example,.selected,.kt-pick'),[]);
+  x.at(5140);
+  assert.deepEqual(notes('.kt-example'),slots[1].midis);
+  x.at(9500);
+  assert.deepEqual(notes('.selected'),slots[1].midis);
+  assert.deepEqual(notes('.kt-midi-held'),[69]);
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
+});
+test('Start ignores the loaded chord, allows fresh touch notes, and restores the selection on Stop', async t => {
+  const x=await setup(t);
+  x.click('Open');
+  x.d.querySelector('#memoryGrid [data-slot="3"]').click();
+  const notes=sel=>[...x.piano.querySelectorAll(sel)].map(k=>Number(k.dataset.midi)).sort((a,b)=>a-b);
+  assert.deepEqual(notes('.kt-pick'),slots[1].midis);
+  await x.round();
+  assert.equal(x.id('Play').disabled,true);
+  assert.deepEqual(notes('.kt-pick,.selected'),[]);
+  for (const note of slots[0].midis) x.tap(note);
+  assert.deepEqual(notes('.kt-pick'),slots[0].midis);
+  x.at(3140); x.click('Play'); await calm();
+  assert.equal(x.id('Feedback').textContent,'On time');
+  x.click('Stop');
+  assert.deepEqual(notes('.kt-pick'),slots[1].midis);
+});

@@ -164,6 +164,13 @@
   }
   let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
+  // A round has its own touch selection, separate from the loaded/editor chord.
+  let roundMode = null;
+  const playingPicks = () => roundMode ? active?.roundPicks : picked;
+  function setRoundMode(mode) {
+    roundMode = mode;
+    document.body.classList.toggle("kt-running-round", !!mode);
+  }
   const lockedControls = new Set();
   const open = () => !practice.hidden;
   const hitMode = () => $("Target").value;
@@ -172,7 +179,8 @@
   window.KTPractice = {
     isHeld: midiHeld,
     isOpen: open,
-    hasPickedNotes: () => open() && picked.size > 0,
+    hideEditorSelection: () => !!roundMode || (open() && picked.size > 0),
+    hideLiveHighlights: () => roundMode === "demo",
     notesForSlot() {
       if (!open()) return null;
       const heldPiano = uniqueNotes(heldNotes());
@@ -188,8 +196,9 @@
     },
     pick(n) {
       if (!open()) return false;
-      if (!active?.demo) {
-        if (picked.has(n)) picked.delete(n); else picked.add(n);
+      const selection = playingPicks();
+      if (selection) {
+        if (selection.has(n)) selection.delete(n); else selection.add(n);
         paintKeys();
       }
       return true;
@@ -200,14 +209,14 @@
         for (const tail of sustained.values()) if (tail.note === n) releasedAt = Math.max(releasedAt, tail.time);
       }
       const elapsed = performance.now() - releasedAt;
-      const showTail = elapsed < sustainFadeMs;
+      const showTail = roundMode !== "demo" && elapsed < sustainFadeMs;
       if (showTail && key.dataset.ktRelease !== String(releasedAt)) {
         key.style.setProperty("--kt-sustain-delay", `-${Math.max(0, elapsed)}ms`);
         key.dataset.ktRelease = String(releasedAt);
       }
       if (!showTail) delete key.dataset.ktRelease;
       key.classList.toggle("kt-midi-sustain", showTail);
-      key.classList.toggle("kt-pick", open() && picked.has(n));
+      key.classList.toggle("kt-pick", open() && !!playingPicks()?.has(n));
       key.classList.toggle("kt-example", open() && demoNotes.includes(n));
       key.classList.toggle("kt-player", open() && performance.now() < touchUntil && touchNotes.includes(n));
     },
@@ -222,7 +231,7 @@
   function announceMidi(message) { $("MidiStatus").textContent = message; }
   function paintKeys() {
     api.refresh();
-    $("Play").disabled = !picked.size || !sequence.length || active?.demo === true;
+    $("Play").disabled = !playingPicks()?.size || !sequence.length;
   }
   function syncHeld() {
     paintKeys();
@@ -304,6 +313,7 @@
     launchPending = false;
     cancelAnimationFrame(frame);
     active = null;
+    setRoundMode(null);
     for (const button of lockedControls) button.disabled = false;
     lockedControls.clear();
     stopSound();
@@ -540,6 +550,8 @@
     if (active || launchPending || !sequence.length) return;
     const token = ++runId;
     launchPending = true;
+    setRoundMode(demo ? "demo" : "practice");
+    paintKeys();
     lockExistingControls();
     $("Click").disabled = true;
     $("Demo").disabled = $("Start").disabled = true;
@@ -554,7 +566,7 @@
       const { audioStart, start } = clocks();
       const plan = makePlan(start, bpm, hitMode(), sequence.length, $("Meter").value);
       plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
-      active = { demo, plan, go: false };
+      active = { demo, plan, go: false, roundPicks: demo ? null : new Set() };
       renderResults(demo ? null : plan);
       for (let i = 0; i < (plan.targets.length + 1) * plan.count; i++) {
         scheduleClick(plan, i, audioStart + i * plan.step / 1000);
@@ -692,8 +704,8 @@
   $("Meter").addEventListener("change", () => { refreshMeter(); renderResults(); });
   $("Target").addEventListener("change", () => { refreshIdle(); renderResults(); });
   $("Play").addEventListener("click", async event => {
-    const notes = uniqueNotes([...picked]);
-    if (!notes.length || active?.demo) return;
+    const notes = uniqueNotes([...(playingPicks() || [])]);
+    if (!notes.length) return;
     const now = performance.now(), token = runId, stamp = event.timeStamp;
     submit(notes, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now, now);
     touchNotes = notes; touchUntil = now + 340;

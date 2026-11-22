@@ -1315,10 +1315,13 @@ function updateSelectionUI() {
   }
   if (!elPiano) return;
   const keys = elPiano.querySelectorAll(".key");
+  const practice = window.KTPractice;
+  const showEditor = !practice?.hideEditorSelection();
+  const showLive = !practice?.hideLiveHighlights();
   for (const k of keys) {
     const midi = Number(k.dataset.midi);
-    k.classList.toggle("selected", selectedMidis.has(midi) && !window.KTPractice?.hasPickedNotes());
-    k.classList.toggle("kt-midi-held", window.KTPractice?.isHeld(midi) ?? false);
+    k.classList.toggle("selected", showEditor && selectedMidis.has(midi));
+    k.classList.toggle("kt-midi-held", showLive && (practice?.isHeld(midi) ?? false));
     window.KTPractice?.paintKey(k, midi);
   }
 }

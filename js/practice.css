@@ -2,6 +2,7 @@
 .kt-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
 .kt-actions button { white-space: nowrap; }
 #ktCapture:disabled { display: none; }
+body.kt-running-round #memoryGrid .memBtn.active { box-shadow: none; }
 #ktOpen[aria-expanded="true"] { border-color: rgba(29,185,84,.55); background: rgba(29,185,84,.15); }
 .kt-slot-label { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 #ktChord, #ktNext { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
