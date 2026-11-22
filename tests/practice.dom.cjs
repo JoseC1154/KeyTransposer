@@ -95,7 +95,9 @@ test('MIDI input scores a chord, distinguishes release, and never changes the tr
   x.at(3180);
   assert.equal(x.d.querySelector('.kt-beats .played').textContent,'1');
   assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: On time');
-  x.at(5700);
+  x.at(7130);
+  assert.match(x.id('Chord').textContent,/Slot 4 ·/);
+  x.at(7140);
   assert.equal(x.id('Feedback').textContent,'Missed · Count in again');
   assert.match(x.id('Chord').textContent,/Slot 1 ·/);
   x.click('Open');
@@ -581,18 +583,24 @@ test('Practice shows the target, keeps pedal tails distinct, and restarts on a w
   for (const n of slots[0].midis) x.send(0x80,n,64);
   assert.equal(x.id('Feedback').textContent,'On time');
 });
-test('An early or late attempt restarts without advancing to a new target', async t => {
-  for (const [offset, feedback] of [[-80,'Early'],[80,'Late']]) {
-    const x=await setup(t);
-    x.click('Open'); await x.midi(); await x.round();
-    x.at(3140+offset);
-    for (const n of slots[0].midis) x.send(0x90,n,90);
-    for (const n of slots[0].midis) x.send(0x80,n,64);
-    assert.match(x.id('Feedback').textContent,new RegExp(feedback+'.*Count in again'));
-    assert.match(x.id('Chord').textContent,/Slot 1 ·/);
-    x.click('Stop');
-    assert.equal(x.piano.querySelectorAll('.kt-guide').length,0);
-  }
+test('A correct chord with loose timing still advances; wrong notes still restart', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  x.at(3060);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  assert.equal(x.id('Feedback').textContent,'Correct · 80 ms early');
+  assert.match(x.id('Chord').textContent,/Slot 4 ·/);
+  x.at(6980);
+  slots[1].midis.forEach((n,i)=>x.send(0x90,n,90,6980+i*65));
+  x.at(7110);
+  for (const n of slots[1].midis) x.send(0x80,n,64);
+  assert.equal(x.id('Feedback').textContent,'Correct · 1840 ms late');
+  assert.match(x.id('Chord').textContent,/Slot 11 ·/);
+  x.at(7200);
+  x.send(0x90,72,90); x.send(0x80,72,64);
+  assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
+  assert.match(x.id('Chord').textContent,/Slot 1 ·/);
 });
 
 function dragMemory(x, element, dy, end = 'pointerup') {

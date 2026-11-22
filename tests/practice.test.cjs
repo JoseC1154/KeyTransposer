@@ -25,9 +25,11 @@ test('Beat tolerance distinguishes on time, early and late', () => {
   assert.equal(score(p,triad,triad,t-56,t).result,'early');
   assert.equal(score(p,triad,triad,t+56,t+60).result,'late');
 });
-test('Count-in or a different beat does not count', () => {
+test('Count-in does not count; a correct chord is accepted late until the next target beat', () => {
   const p = makePlan(0, 120, '1');
-  for (const offset of [0,1000,1500,2500,3000,3500]) assert.equal(score(p,triad,triad,offset),null);
+  for (const offset of [0,1000,1500,4000,4500]) assert.equal(score(p,triad,triad,offset),null);
+  for (const offset of [2500,3000,3500,3999]) assert.equal(score(p,triad,triad,offset).result,'late');
+  assert.equal(score(p,triad,triad,3900,4000),null);
 });
 test('Ignore accidental repeat after a graded bar', () => {
   const p = makePlan(0,120,'1');
@@ -40,8 +42,8 @@ test('Uniform octave shifts count, but altered voicings, extra notes and excessi
   const p = makePlan(0,120,'1');
   for(const notes of [[60,64],[60,64,67,72],[60,67,76],[61,65,68]]) assert.equal(score(p,notes,triad,2000).result,'wrong');
   for(const notes of [[48,52,55],[72,76,79],[84,88,91]]) assert.equal(score(p,notes,triad,2000).result,'on');
-  assert.equal(score(p,[67,60,64],triad,2000,2095).result,'on');
-  assert.equal(score(p,triad,triad,2000,2096).result,'wrong');
+  assert.equal(score(p,[67,60,64],triad,2000,2155).result,'on');
+  assert.equal(score(p,triad,triad,2000,2156).result,'wrong');
 });
 test('MIDI decodes channels, note-off and zero velocity; ignores CC', () => {
   assert.deepEqual(midiMessage([0x94,60,72]),{key:'4:60',note:60,down:true});
@@ -69,4 +71,14 @@ test('Rotate respects the selected meter and fixed targets clamp to a smaller ba
   const p = makePlan(0, 120, 'rotate', 5, '3/4');
   assert.deepEqual(p.targets.map(t=>t.beat), [1,2,3,1,2]);
   assert.equal(makePlan(0, 120, '7', 1, '2/4').targets[0].beat,2);
+});
+
+test('Cutoffs use the next assigned beat in Rotate and the end of the final bar', () => {
+  const p = makePlan(0, 120, 'rotate', 2, '4/4');
+  assert.deepEqual(p.targets.map(t=>t.deadline), [4500,6000]);
+  assert.equal(score(p,triad,triad,4499).result,'late');
+  assert.equal(score(p,triad,triad,4500),null);
+  p.targets[0].result='on';
+  assert.equal(score(p,triad,triad,5999).result,'late');
+  assert.equal(score(p,triad,triad,6000),null);
 });

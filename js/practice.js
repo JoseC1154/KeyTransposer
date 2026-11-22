@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const NOTE_SPREAD = 95;
+  const NOTE_SPREAD = 155;
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
   const uniqueNotes = notes => [...new Set(notes.filter(n => Number.isInteger(n) && n >= 21 && n <= 108))].sort((a, b) => a - b);
   function sameVoicing(a, b) {
@@ -26,13 +26,15 @@
       const hit = beat === "rotate" ? i % count + 1 : clamp(Number(beat) || 1, 1, count);
       return { time: start + ((i + 1) * count + hit - 1) * step, beat: hit, result: null };
     });
-    return { start, step, count, accents, tolerance, window, targets, end: Math.max(start + (bars + 1) * count * step, targets.at(-1).time + window + NOTE_SPREAD + 30) };
+    const end = start + (bars + 1) * count * step;
+    targets.forEach((target, i) => { target.deadline = targets[i + 1]?.time ?? end; });
+    return { start, step, count, accents, tolerance, window, targets, end };
   }
   function score(plan, notes, expected, first, last = first) {
-    // Closest target overall, not closest remaining target: extra presses cannot fill a different bar.
-    const target = plan.targets.reduce((nearest, t) => Math.abs(first - t.time) < Math.abs(first - nearest.time) ? t : nearest);
+    // Stay on the current chord until it passes, or the next chord's beat arrives.
+    const target = plan.targets.find(t => !t.result);
+    if (!target || first < target.time - plan.window || last >= target.deadline) return null;
     const delta = first - target.time;
-    if (target.result || Math.abs(delta) > plan.window) return null;
     const result = !sameVoicing(uniqueNotes(notes), uniqueNotes(target.notes || expected)) || last - first > NOTE_SPREAD ? "wrong"
       : delta < -plan.tolerance ? "early" : delta > plan.tolerance ? "late" : "on";
     return { target, delta, result };
@@ -55,7 +57,7 @@
   const beatStrip = practice.querySelector(".kt-beats");
   let beats = [...beatStrip.children];
   const api = window.KTTransposer;
-  const statusText = { on: "On time", early: "Early", late: "Late", wrong: "Wrong chord", miss: "Missed" };
+  const statusText = { on: "On time", wrong: "Wrong chord", miss: "Missed" };
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
   let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
   const pedalDown = new Set(), sustained = new Map();
@@ -333,7 +335,8 @@
       const el = document.createElement("span");
       el.className = t.result || "";
       el.textContent = ({on:"✓",early:"‹",late:"›",wrong:"×",miss:"·"})[t.result] || t.slot;
-      el.setAttribute("aria-label", "Slot " + t.slot + ": " + (statusText[t.result] || "pending"));
+      const status = t.timing && t.timing !== "on" ? "Correct, " + t.timing : statusText[t.result] || "pending";
+      el.setAttribute("aria-label", "Slot " + t.slot + ": " + status);
       return el;
     }));
   }
@@ -565,15 +568,17 @@
   }
   function result(data) {
     const { target, result, delta } = data;
-    target.result = result;
-    const label = statusText[result] + (result === "early" || result === "late" ? " · " + Math.round(Math.abs(delta)) + " ms" : "");
-    if (result !== "on") {
-      startRound(false, label, result);
+    if (result === "wrong") {
+      startRound(false, statusText.wrong, "wrong");
       return true;
     }
+    target.result = "on";
+    target.timing = result;
+    const label = result === "on" ? statusText.on
+      : "Correct · " + Math.round(Math.abs(delta)) + " ms " + result;
     glowBeat = target.beat - 1;
     glowUntil = Math.max(performance.now(), target.time) + 340;
-    feedback(label, result);
+    feedback(label, "on");
     renderResults(active.plan);
     const next = updatePracticeGuide(active.plan);
     const index = Math.floor((performance.now() - active.plan.start) / active.plan.step);
@@ -585,7 +590,13 @@
     if (!active || active.demo || active.listen) return;
     const scored = score(active.plan, notes, [], first, last);
     if (scored) return result(scored);
-    else if (first >= active.plan.start + (active.plan.count - .5) * active.plan.step && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
+    const target = active.plan.targets.find(t => !t.result);
+    if (target && last >= target.deadline) {
+      startRound(false, statusText.miss, "miss");
+      return true;
+    }
+    if (target && first >= active.plan.start + (active.plan.count - .5) * active.plan.step
+      && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
       feedback("Aim for the outlined beat");
     }
   }
@@ -647,9 +658,12 @@
     const position = demo ? clamp(bar, 0, plan.targets.length - 1) : updatePracticeGuide(plan);
     const state = position < 0 ? null : plan.targets[position];
     if (demo) displaySlot(position);
-    if (!demo && state && now > state.time + plan.window + NOTE_SPREAD + 18) {
-      startRound(false, "Missed", "miss");
-      return;
+    if (!demo && state && now >= state.deadline) {
+      // Give an in-window attack time to finish grading, but never accept a note past the cutoff.
+      if (!attempt || attempt.first >= state.deadline || now > attempt.first + NOTE_SPREAD + 18) {
+        startRound(false, statusText.miss, "miss");
+        return;
+      }
     }
     const pulse = index >= 0 && index < (plan.targets.length + 1) * plan.count ? index % plan.count : -1;
     if (index >= plan.count && !active.go) {
@@ -663,9 +677,10 @@
       paintKeys();
     }
     renderBeats(state ? state.beat - 1 : -1, pulse, showingDemo, now < glowUntil ? glowBeat : -1);
-    if (now >= plan.end) {
+    if (now >= plan.end && (demo || !state)) {
       const good = plan.targets.filter(t => t.result === "on").length;
-      stop(demo ? "Ready to try?" : good + " of " + plan.targets.length + " on time");
+      const label = plan.targets.every(t => t.timing === "on") ? " on time" : " correct";
+      stop(demo ? "Ready to try?" : good + " of " + plan.targets.length + label);
       return;
     }
     frame = requestAnimationFrame(tick);
