@@ -125,6 +125,82 @@
     const saved = kind === "clear" ? null : {...value, name: name.value.trim() || value.name};
     apply([{...current, value:saved}], (kind === "clear" ? "Cleared " : kind === "rename" ? "Renamed " : "Saved ") + label(current));
   });
+  const transpose = $("transposeSlotsModal");
+  const transposeButton = $("transposeSlots");
+  const shiftSelect = $("transposeSlotsShift");
+  const transposeApply = $("transposeSlotsApply");
+  let shiftSource = null;
+  const bankSlots = bank => Array.from({length:12}, (_, slot) => api.get(bank, slot));
+
+  function closeTranspose() {
+    shiftSource = null;
+    transpose.close();
+    transposeButton.focus({preventScroll:true});
+  }
+  dismissOnBackdrop(transpose, closeTranspose);
+  transpose.addEventListener("cancel", e => { e.preventDefault(); closeTranspose(); });
+  $("transposeSlotsClose").addEventListener("click", closeTranspose);
+  for (let offset = -12; offset <= 12; offset++) {
+    if (!offset) continue;
+    shiftSelect.append(new Option((offset > 0 ? "+" : "−") + Math.abs(offset) + (Math.abs(offset) === 1 ? " semitone" : " semitones"), String(offset)));
+  }
+  function shiftPreview() {
+    if (!shiftSource) return [];
+    const offset = Number(shiftSelect.value);
+    if (!Number.isInteger(offset) || !offset || Math.abs(offset) > 12) return [];
+    return shiftSource.slots.flatMap((chord, slot) => {
+      if (!chord) return [];
+      const midis = chord.midis.map(n => n + offset);
+      const automatic = chord.name && chord.name === api.nameFor(chord.midis);
+      const value = {midis, name: automatic ? api.nameFor(midis) || chord.name : chord.name};
+      return [{bank:shiftSource.bank, slot, value, outOfRange:
+        !midis.length || midis.some(n => !Number.isInteger(n) || n < 21 || n > 108)}];
+    });
+  }
+  function renderTranspose() {
+    const changes = shiftPreview();
+    const invalid = changes.some(change => change.outOfRange);
+    $("transposeSlotsStatus").textContent = invalid ? "This shift goes beyond the piano’s range."
+      : changes.length ? "Updates the saved chords in this bank only." : "No saved chords in this bank.";
+    $("transposeSlotsPreview").replaceChildren(...changes.map(({slot, value}) => {
+      const row = document.createElement("li");
+      const before = shiftSource.slots[slot];
+      row.textContent = "Slot " + (slot + 1) + (before.name ? " · " + before.name : "") + ": "
+        + api.noteNames(before.midis) + " → " + api.noteNames(value.midis);
+      return row;
+    }));
+    transposeApply.disabled = invalid || !changes.length;
+    transposeApply.textContent = changes.length ? "Transpose " + changes.length + (changes.length === 1 ? " slot" : " slots") : "Transpose slots";
+  }
+  transposeButton.addEventListener("click", () => {
+    if (transpose.open) return;
+    api.prepareEdit();
+    const bank = api.currentBank();
+    shiftSource = {bank, slots:bankSlots(bank)};
+    shiftSelect.value = "1";
+    $("transposeSlotsTitle").textContent = "Transpose " + api.bankName(bank) + " bank";
+    renderTranspose();
+    transpose.showModal();
+    shiftSelect.focus();
+  });
+  shiftSelect.addEventListener("change", renderTranspose);
+  $("transposeSlotsForm").addEventListener("submit", e => {
+    e.preventDefault();
+    if (!transpose.open || !shiftSource || transposeApply.disabled) return;
+    const changes = shiftPreview();
+    if (!changes.length || changes.some(change => change.outOfRange)) return;
+    if (api.currentBank() !== shiftSource.bank || bankSlots(shiftSource.bank).some((chord,i) => chord !== shiftSource.slots[i])) {
+      $("transposeSlotsStatus").textContent = "The bank changed. Close and reopen to preview again.";
+      transposeApply.disabled = true;
+      return;
+    }
+    if (!api.commit(changes)) {
+      $("transposeSlotsStatus").textContent = "Couldn’t save. No slots changed.";
+      return;
+    }
+    $("slotActionStatus").textContent = "Transposed " + changes.length + (changes.length === 1 ? " slot." : " slots.");
+    closeTranspose();
+  });
   window.KTSlotEditor = {
     openSlot(bank, slot) {
       if (!enabled) return false;

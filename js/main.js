@@ -1365,6 +1365,7 @@ if ("serviceWorker" in navigator) {
 window.KTChordMemory = {
   get: getSlot,
   bankName: bank => NOTES_SHARP[bank],
+  currentBank: () => currentScalePc,
   notesToSave: () => window.KTPractice?.notesForSlot() || [...selectedMidis],
   nameFor: notes => detectChordNameFromMidis(notes) || "",
   noteNames: notes => notes.map(midiToNote).join(" · "),

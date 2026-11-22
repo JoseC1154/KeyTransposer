@@ -882,3 +882,50 @@ test('Loop keeps Example finite and restarts a failed Practice pass with count-i
   assert.equal(x.id('Loop').getAttribute('aria-pressed'),'true');
   x.click('Stop');
 });
+
+test('Transpose slots previews then shifts only filled slots in the chosen bank, not the working chord', async t => {
+  const x=await setup(t);
+  const id=n=>x.d.getElementById(n);
+  const data=()=>JSON.parse(x.w.localStorage.getItem('pct_state_v1'));
+  x.tap(65);
+  const before=data();
+  id('transposeSlots').click();
+  assert.match(id('transposeSlotsTitle').textContent,/C bank/);
+  assert.match(id('transposeSlotsPreview').children[0].textContent,/C4 · E4 · G4 → C#4 · F4 · G#4/);
+  assert.deepEqual(data(),before);
+  id('transposeSlotsClose').click();
+  assert.deepEqual(data(),before);
+  id('slotEdit').click();
+  assert.equal(id('slotEdit').textContent,'Done');
+  id('transposeSlots').click();
+  id('transposeSlotsForm').dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+  const after=data();
+  assert.equal(id('transposeSlotsModal').open,false);
+  for (const entry of slots) assert.deepEqual(after.bankChords[0][entry.slot-1].midis,entry.midis.map(n=>n+1));
+  assert.equal(after.bankChords[0][1],null);
+  assert.equal(after.currentScalePc,before.currentScalePc);
+  assert.deepEqual(after.bankChords.slice(1),before.bankChords.slice(1));
+  assert.deepEqual([...x.w.KTTransposer.selection().notes],[65]);
+  assert.equal(id('slotEdit').textContent,'Done');
+});
+test('Transpose slots blocks out-of-range shifts and leaves memory untouched on save failure', async t => {
+  const x=await setup(t,[{slot:1,name:'High notes',midis:[101,105,108]}]);
+  const id=n=>x.d.getElementById(n);
+  const saved=x.w.localStorage.getItem('pct_state_v1');
+  const submit=()=>id('transposeSlotsForm').dispatchEvent(new x.w.Event('submit',{bubbles:true,cancelable:true}));
+  id('transposeSlots').click();
+  assert.equal(id('transposeSlotsApply').disabled,true);
+  submit();
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
+  id('transposeSlotsShift').value='-1';
+  id('transposeSlotsShift').dispatchEvent(new x.w.Event('change'));
+  assert.equal(id('transposeSlotsApply').disabled,false);
+  const original=x.w.Storage.prototype.setItem;
+  x.w.Storage.prototype.setItem=()=>{throw new Error('No storage');};
+  try { submit(); } finally { x.w.Storage.prototype.setItem=original; }
+  assert.equal(id('transposeSlotsModal').open,true);
+  assert.match(id('transposeSlotsStatus').textContent,/No slots changed/);
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
+  submit();
+  assert.deepEqual(JSON.parse(x.w.localStorage.getItem('pct_state_v1')).bankChords[0][0].midis,[100,104,107]);
+});

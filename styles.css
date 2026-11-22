@@ -1024,15 +1024,15 @@ select{
 }
 
 /* Chord memory editor */
-.slot-tools { display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--muted); font-size:.85rem; font-weight:700; }
+.slot-tools { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; color:var(--muted); font-size:.85rem; font-weight:700; }
 #slotActionStatus { margin-left:auto; font-weight:500; text-align:right; overflow-wrap:anywhere; }
 #slotEdit { flex:none; }
 #slotEdit[aria-pressed="true"] { color:var(--text); border-color:rgba(29,185,84,.65); background:rgba(29,185,84,.16); }
-#slotEditor {
+#slotEditor, #transposeSlotsModal {
   width:min(420px, calc(100% - 24px)); color:var(--text); background:#202020;
   border:1px solid rgba(255,255,255,.20); border-radius:16px; padding:16px;
 }
-#slotEditor::backdrop { background:rgba(0,0,0,.65); backdrop-filter:blur(4px); }
+#slotEditor::backdrop, #transposeSlotsModal::backdrop { background:rgba(0,0,0,.65); backdrop-filter:blur(4px); }
 .slot-editor-head, .slot-editor-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .slot-editor-head h2 { margin:0; font-size:1.1rem; }
 #slotEditorCurrent, #slotEditorMessage { color:var(--muted); margin:8px 0; overflow-wrap:anywhere; }
@@ -1050,3 +1050,11 @@ select{
 #memoryGrid.is-editing .memBtn { border-style: dashed; }
 #memoryGrid.is-editing .memBtn:hover, #memoryGrid.is-editing .memBtn:focus-visible { border-color: var(--accent); }
 .slot-editor-actions [data-slot-action="load"] { grid-column: 1 / -1; }
+
+#transposeSlotsForm { display:grid; gap:10px; margin-top:10px; }
+#transposeSlotsForm label { display:flex; align-items:center; gap:8px; }
+#transposeSlotsShift { color:var(--text); background:#202020; border:1px solid #555; border-radius:8px; padding:8px; }
+#transposeSlotsStatus, #transposeSlotsPreview { margin:0; }
+#transposeSlotsStatus { color:var(--muted); }
+#transposeSlotsPreview { list-style:none; padding:0; max-height:38dvh; overflow:auto; }
+#transposeSlotsPreview li { padding:6px 0; border-bottom:1px solid rgba(255,255,255,.12); overflow-wrap:anywhere; }
