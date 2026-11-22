@@ -96,7 +96,8 @@ test('MIDI input scores a chord, distinguishes release, and never changes the tr
   assert.equal(x.d.querySelector('.kt-beats .played').textContent,'1');
   assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: On time');
   x.at(5700);
-  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: Missed');
+  assert.equal(x.id('Feedback').textContent,'Missed · Count in again');
+  assert.match(x.id('Chord').textContent,/Slot 1 ·/);
   x.click('Open');
   assert.equal(x.w.KTTransposer.selection().notes.length,0);
 });
@@ -553,4 +554,43 @@ test('Start ignores the loaded chord, allows fresh touch notes, and restores the
   assert.equal(x.id('Feedback').textContent,'On time');
   x.click('Stop');
   assert.deepEqual(notes('.kt-pick'),slots[1].midis);
+});
+
+test('Practice shows the target, keeps pedal tails distinct, and restarts on a wrong later chord', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  const notes=sel=>[...x.piano.querySelectorAll(sel)].map(k=>Number(k.dataset.midi)).sort((a,b)=>a-b);
+  assert.deepEqual(notes('.kt-guide'),slots[0].midis);
+  x.at(3140); x.send(0xb0,64,127);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  assert.deepEqual(notes('.kt-midi-held'),slots[0].midis);
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  assert.deepEqual(notes('.kt-midi-sustain'),slots[0].midis);
+  x.at(5140);
+  assert.deepEqual(notes('.kt-guide'),slots[1].midis);
+  assert.deepEqual(notes('.kt-midi-sustain'),slots[0].midis);
+  x.send(0x90,72,90); x.send(0x80,72,64);
+  assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
+  assert.deepEqual(notes('.kt-guide'),slots[0].midis);
+  assert.match(x.id('Chord').textContent,/Slot 1 ·/);
+  assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: pending');
+  x.send(0xb0,64,0);
+  assert.deepEqual(notes('.kt-midi-sustain'),[]);
+  x.at(7280);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  assert.equal(x.id('Feedback').textContent,'On time');
+});
+test('An early or late attempt restarts without advancing to a new target', async t => {
+  for (const [offset, feedback] of [[-80,'Early'],[80,'Late']]) {
+    const x=await setup(t);
+    x.click('Open'); await x.midi(); await x.round();
+    x.at(3140+offset);
+    for (const n of slots[0].midis) x.send(0x90,n,90);
+    for (const n of slots[0].midis) x.send(0x80,n,64);
+    assert.match(x.id('Feedback').textContent,new RegExp(feedback+'.*Count in again'));
+    assert.match(x.id('Chord').textContent,/Slot 1 ·/);
+    x.click('Stop');
+    assert.equal(x.piano.querySelectorAll('.kt-guide').length,0);
+  }
 });

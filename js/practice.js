@@ -148,7 +148,7 @@
     $("PianoSoundLabel").hidden = $("SizeLabel").hidden = !port;
     api.setMidiLayout(port ? Number(midiSize.value) : null);
   }
-  let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
+  let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], guideNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
   // A round has its own touch selection, separate from the loaded/editor chord.
   let roundMode = null;
@@ -204,6 +204,7 @@
       key.classList.toggle("kt-midi-sustain", showTail);
       key.classList.toggle("kt-pick", open() && !!playingPicks()?.has(n));
       key.classList.toggle("kt-example", open() && demoNotes.includes(n));
+      key.classList.toggle("kt-guide", roundMode === "practice" && guideNotes.includes(n));
       key.classList.toggle("kt-player", open() && performance.now() < touchUntil && touchNotes.includes(n));
     },
   };
@@ -304,7 +305,7 @@
     lockedControls.clear();
     stopSound();
     resetAttempt();
-    demoNotes = []; touchNotes = []; touchUntil = 0;
+    demoNotes = []; guideNotes = []; touchNotes = []; touchUntil = 0;
     glowBeat = -1; glowUntil = 0;
     for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = false;
     $("Demo").disabled = $("Start").disabled = !sequence.length;
@@ -429,17 +430,21 @@
   function result(data) {
     const { target, result, delta } = data;
     target.result = result;
-    if (result !== "wrong") {
-      glowBeat = target.beat - 1;
-      glowUntil = Math.max(performance.now(), target.time) + 340;
+    const label = statusText[result] + (result === "early" || result === "late" ? " · " + Math.round(Math.abs(delta)) + " ms" : "");
+    if (result !== "on") {
+      startRound(false, label, result);
+      return true;
     }
-    feedback(statusText[result] + (result === "early" || result === "late" ? " · " + Math.round(Math.abs(delta)) + " ms" : ""), result);
+    glowBeat = target.beat - 1;
+    glowUntil = Math.max(performance.now(), target.time) + 340;
+    feedback(label, result);
     renderResults(active.plan);
+    return false;
   }
   function submit(notes, first, last) {
     if (!active || active.demo || active.listen) return;
     const scored = score(active.plan, notes, [], first, last);
-    if (scored) result(scored);
+    if (scored) return result(scored);
     else if (first >= active.plan.start + (active.plan.count - .5) * active.plan.step && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
       feedback("Aim for the outlined beat");
     }
@@ -499,13 +504,33 @@
     const { plan, demo } = active;
     const index = Math.floor((now - plan.start) / plan.step);
     const bar = Math.floor(index / plan.count) - 1;
-    const position = clamp(bar, 0, plan.targets.length - 1);
+    let position = clamp(bar, 0, plan.targets.length - 1);
+    if (!demo) {
+      const unresolved = plan.targets.findIndex(t => !t.result);
+      if (unresolved >= 0) {
+        const next = plan.targets[unresolved];
+        if (now > next.time + plan.window + NOTE_SPREAD + 18) {
+          startRound(false, "Missed", "miss");
+          return;
+        }
+        // A late target near the end of the bar can still be awaiting a score.
+        position = Math.min(position, unresolved);
+      }
+    }
     const state = plan.targets[position];
+    if (!demo && guideNotes !== state.notes) {
+      if (guideNotes.length) {
+        active.roundPicks.clear();
+        touchNotes = []; touchUntil = 0;
+      }
+      guideNotes = state.notes;
+      paintKeys();
+    }
     displaySlot(position);
     const pulse = index >= 0 && index < (plan.targets.length + 1) * plan.count ? index % plan.count : -1;
     if (index >= plan.count && !active.go) {
       active.go = true;
-      if (demo || lastFeedback.startsWith("Count")) feedback(demo ? "Example playing" : "Your turn");
+      if (demo || lastFeedback.includes("Count in")) feedback(demo ? "Example playing" : "Your turn");
     }
     const showingDemo = demo && bar >= 0 && bar < plan.targets.length && now >= state.time && now < state.time + Math.min(460, plan.step * .72);
     const highlighted = showingDemo ? state.notes : [];
@@ -514,21 +539,30 @@
       paintKeys();
     }
     renderBeats(state.beat - 1, pulse, showingDemo, now < glowUntil ? glowBeat : -1);
-    if (!demo) {
-      for (const t of plan.targets) {
-        if (!t.result && now > t.time + plan.window + NOTE_SPREAD + 18) {
-          t.result = "miss";
-          feedback("Missed", "miss");
-          renderResults(plan);
-        }
-      }
-    }
     if (now >= plan.end) {
       const good = plan.targets.filter(t => t.result === "on").length;
       stop(demo ? "Ready to try?" : good + " of " + plan.targets.length + " on time");
       return;
     }
     frame = requestAnimationFrame(tick);
+  }
+  function startRound(demo, reason = "", kind = "") {
+    cancelAnimationFrame(frame);
+    resetAttempt();
+    stopSound();
+    glowBeat = -1; glowUntil = 0;
+    guideNotes = []; demoNotes = []; touchNotes = []; touchUntil = 0;
+    const { audioStart, start } = clocks();
+    const plan = makePlan(start, practiceTempo(), hitMode(), sequence.length, $("Meter").value);
+    plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
+    active = { demo, plan, go: false, roundPicks: demo ? null : new Set() };
+    renderResults(demo ? null : plan);
+    for (let i = 0; i < (plan.targets.length + 1) * plan.count; i++) {
+      scheduleClick(plan, i, audioStart + i * plan.step / 1000);
+    }
+    if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
+    feedback(reason ? reason + " · Count in again" : "Count in · 1 bar", kind);
+    tick();
   }
   async function launch(demo) {
     refreshBank();
@@ -544,21 +578,8 @@
     try {
       await unlockAudio();
       if (token !== runId || !open()) return;
-      const bpm = practiceTempo();
       for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = true;
-      resetAttempt();
-      stopSound();
-      const { audioStart, start } = clocks();
-      const plan = makePlan(start, bpm, hitMode(), sequence.length, $("Meter").value);
-      plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
-      active = { demo, plan, go: false, roundPicks: demo ? null : new Set() };
-      renderResults(demo ? null : plan);
-      for (let i = 0; i < (plan.targets.length + 1) * plan.count; i++) {
-        scheduleClick(plan, i, audioStart + i * plan.step / 1000);
-      }
-      if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
-      feedback("Count in · 1 bar");
-      tick();
+      startRound(demo);
     } catch {
       if (token === runId) stop("Audio unavailable. Tap Start to try again.");
     } finally {
@@ -691,14 +712,14 @@
   $("Play").addEventListener("click", async event => {
     const notes = uniqueNotes([...(playingPicks() || [])]);
     if (!notes.length) return;
-    const now = performance.now(), token = runId, stamp = event.timeStamp;
-    submit(notes, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now, now);
+    const now = performance.now(), token = runId, session = active, stamp = event.timeStamp;
+    if (submit(notes, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now, now)) return;
     touchNotes = notes; touchUntil = now + 340;
     paintKeys();
     setTimeout(() => paintKeys(), 350);
     try {
       await unlockAudio();
-      if (open() && token === runId) soundChord(notes, audio.currentTime + .005, .30);
+      if (open() && token === runId && session === active) soundChord(notes, audio.currentTime + .005, .30);
     } catch {}
   });
   refreshMeter();
