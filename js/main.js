@@ -270,7 +270,6 @@ function initApp() {
 // Cache references once immediately (scripts load after DOM in index.html)
 cacheDomRefs();
 
-onReady(initApp);
 
 const STORAGE_KEY = "pct_state_v1";
 
@@ -1275,6 +1274,7 @@ function updateSelectionUI() {
   for (const k of keys) {
     const midi = Number(k.dataset.midi);
     k.classList.toggle("selected", selectedMidis.has(midi));
+    k.classList.toggle("kt-midi-held", window.KTPractice?.isHeld(midi) ?? false);
   }
 }
 
@@ -1298,3 +1298,21 @@ if ("serviceWorker" in navigator) {
     }
   });
 }
+
+// A deliberate capture only; MIDI preview never overwrites saved slots.
+window.KTTransposer = {
+  selection: () => ({ notes: [...selectedMidis], name: activeChordName }),
+  chords: () => bankChords[currentScalePc].map((slot, i) => slot && ({ notes: slot.midis.slice(), name: slot.name, slot: i + 1 })),
+  capture(notes) {
+    selectedMidis = new Set(notes.filter(n => n >= PIANO_START_MIDI && n < PIANO_END_MIDI));
+    activeSlot = -1;
+    activeBankPc = -1;
+    undoHistory = [];
+    updateUndoButton();
+    updateSelectionUI();
+    updateHint();
+  },
+  refresh: updateSelectionUI,
+};
+
+onReady(initApp);

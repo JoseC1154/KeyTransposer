@@ -9,6 +9,7 @@
 
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="js/practice.css" />
 
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -38,7 +39,12 @@
       </div>
     </div>
   </div>
+  <div class="kt-actions">
+  <button class="ghost" id="ktOpen" type="button">Practice</button>
+  <button class="ghost" id="ktMidi" type="button">MIDI</button>
+  <button class="ghost" id="ktCapture" type="button" disabled>Use held notes</button>
   <button class="ghost" id="btnClear" type="button">Clear</button>
+  </div>
 </header>
 
   <main class="wrap">
@@ -95,6 +101,55 @@
     </footer>
 
   </main>
+  <section id="ktPractice" hidden aria-labelledby="ktTitle">
+    <header class="kt-practice-head">
+      <button class="ghost" id="ktBack" type="button" aria-label="Back to transposer">←</button>
+      <h1 id="ktTitle">Practice</h1>
+      <button class="ghost" id="ktPracticeMidi" type="button">MIDI</button>
+    </header>
+    <div class="kt-card">
+      <div class="kt-setup">
+        <label>Chord <select id="ktChord"></select></label>
+        <label>Hit on <select id="ktTarget">
+          <option value="1">Beat 1</option><option value="2">Beat 2</option>
+          <option value="3">Beat 3</option><option value="4">Beat 4</option>
+          <option value="rotate">Rotate 1–4</option>
+        </select></label>
+        <label>BPM <input id="ktTempo" type="number" value="72" min="40" max="160" step="1" inputmode="numeric" /></label>
+      </div>
+      <div class="kt-beats" role="group" aria-label="Four beats per bar">
+        <span>1</span><span>2</span><span>3</span><span>4</span>
+      </div>
+      <div class="kt-transport">
+        <button class="ghost kt-demo" id="ktDemo" type="button">▶ Example</button>
+        <button class="ghost kt-start" id="ktStart" type="button">Start</button>
+        <button class="ghost" id="ktStop" type="button" hidden>Stop</button>
+      </div>
+      <div class="kt-feedback" id="ktFeedback" role="status"></div>
+      <div class="kt-results" id="ktResults" aria-label="Results by bar"></div>
+      <div class="kt-keyboard-wrap">
+        <div class="kt-keyboard" id="ktKeyboard" aria-label="Practice piano"></div>
+      </div>
+      <div class="kt-keyboard-actions">
+        <span><i class="kt-swatch demo"></i> Example</span>
+        <button class="ghost" id="ktPlay" type="button" disabled>Play selected</button>
+        <span><i class="kt-swatch player"></i> You</span>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="ktMidiDialog" aria-labelledby="ktMidiTitle">
+    <form method="dialog" class="kt-dialog-head">
+      <h2 id="ktMidiTitle">MIDI keyboard</h2>
+      <button class="ghost" aria-label="Close MIDI settings">×</button>
+    </form>
+    <p id="ktMidiStatus" role="status"></p>
+    <div class="kt-midi-controls">
+      <button class="ghost" id="ktConnect" type="button">Connect MIDI</button>
+      <label id="ktPortLabel" hidden>Input <select id="ktPort"></select></label>
+      <button class="ghost" id="ktDisconnect" type="button" hidden>Disconnect</button>
+    </div>
+  </dialog>
   <!-- ===== MENU MODAL ===== -->
   <div class="modal" id="menuModal" hidden>
     <div class="modalOverlay" data-close="menuModal"></div>
@@ -282,5 +337,6 @@
   <script src="js/chordDetection.js"></script>
   <script src="js/chordAlternates.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/practice.js"></script>
 </body>
 </html>

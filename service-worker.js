@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v4";
+const CACHE_NAME = "piano-transposer-v5-practice";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,8 @@ const ASSETS = [
   "./js/chordDetection.js",
   "./js/chordAlternates.js",
   "./js/main.js",
+  "./js/practice.js",
+  "./js/practice.css",
   "./manifest.json",
   "./service-worker.js",
   // NOTE: icons are intentionally NOT pre-cached.
@@ -34,7 +36,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : Promise.resolve())))
+      Promise.all(keys.map((k) => (k.startsWith("piano-transposer-") && k !== CACHE_NAME ? caches.delete(k) : Promise.resolve())))
     ).then(() => self.clients.claim())
   );
 });
