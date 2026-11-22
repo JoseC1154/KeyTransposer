@@ -1052,8 +1052,10 @@ select{
 .slot-editor-actions [data-slot-action="load"] { grid-column: 1 / -1; }
 
 #transposeSlotsForm { display:grid; gap:10px; margin-top:10px; }
-#transposeSlotsForm label { display:flex; align-items:center; gap:8px; }
-#transposeSlotsShift { color:var(--text); background:#202020; border:1px solid #555; border-radius:8px; padding:8px; }
+.slot-shift-arrows { display:flex; align-items:center; gap:6px; }
+.slot-shift-arrows button { min-width:36px; min-height:38px; padding:4px 8px; color:var(--accent); }
+.slot-shift-arrows button:disabled { opacity:.45; }
+#transposeSlotsShift { color:var(--text); text-align:center; min-width:8rem; font-variant-numeric:tabular-nums; }
 #transposeSlotsStatus, #transposeSlotsPreview { margin:0; }
 #transposeSlotsStatus { color:var(--muted); }
 #transposeSlotsPreview { list-style:none; padding:0; max-height:38dvh; overflow:auto; }

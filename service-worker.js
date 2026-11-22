@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v24-transpose-slots";
+const CACHE_NAME = "piano-transposer-v25-memory-transpose-arrows";
 const ASSETS = [
   "./",
   "./index.html",

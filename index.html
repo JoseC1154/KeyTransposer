@@ -112,7 +112,10 @@
       <div class="slot-tools">
         <span>Chord Memory</span>
         <span id="slotActionStatus" role="status"></span>
-        <button class="ghost" id="transposeSlots" type="button" aria-haspopup="dialog" aria-controls="transposeSlotsModal">Transpose slots</button>
+        <div class="slot-shift-arrows" role="group" aria-label="Transpose saved slots">
+          <button class="ghost" id="transposeSlotsDown" type="button" aria-label="Transpose saved slots down" title="Transpose saved slots down" aria-haspopup="dialog" aria-controls="transposeSlotsModal">▼</button>
+          <button class="ghost" id="transposeSlotsUp" type="button" aria-label="Transpose saved slots up" title="Transpose saved slots up" aria-haspopup="dialog" aria-controls="transposeSlotsModal">▲</button>
+        </div>
         <button class="ghost" id="slotEdit" type="button" aria-pressed="false">Edit</button>
       </div>
       <div class="memoryStrip" id="memoryGrid" role="group" aria-label="12 chord memory slots">
@@ -142,7 +145,11 @@
       <button class="ghost" id="transposeSlotsClose" type="button" aria-label="Close transpose slots">×</button>
     </div>
     <form id="transposeSlotsForm">
-      <label>Shift <select id="transposeSlotsShift" aria-label="Semitones to shift"></select></label>
+      <div class="slot-shift-arrows" role="group" aria-label="Semitones to shift">
+        <button class="ghost" id="transposePreviewDown" type="button" aria-label="Preview one semitone lower">▼</button>
+        <output id="transposeSlotsShift" aria-live="polite">+1 semitone</output>
+        <button class="ghost" id="transposePreviewUp" type="button" aria-label="Preview one semitone higher">▲</button>
+      </div>
       <p id="transposeSlotsStatus" role="status"></p>
       <ol id="transposeSlotsPreview" aria-label="Saved chord preview"></ol>
       <button class="ghost" id="transposeSlotsApply" type="submit">Apply</button>
