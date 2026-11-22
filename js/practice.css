@@ -10,6 +10,25 @@ body.kt-running-round #memoryGrid .memBtn[data-kt-playing] {
   box-shadow: 0 0 0 2px var(--kt-slot-glow);
   animation: kt-slot-hit .25s ease-out;
 }
+body.kt-practicing #memoryGrid .memBtn[data-kt-resonance="held"] {
+  color: #101c19;
+  border-color: #54debc;
+  background: #54debc;
+}
+body.kt-practicing #memoryGrid .memBtn[data-kt-resonance="sustain"] {
+  color: #e7fff8;
+  border-color: #449d88;
+  background: #224b41;
+  box-shadow: none;
+  animation: kt-slot-sustain 2.4s ease-out var(--kt-slot-decay-delay, 0ms) both;
+}
+@keyframes kt-slot-sustain {
+  from { background-color: #448f7d; }
+  to { background-color: #224b41; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.kt-practicing #memoryGrid .memBtn[data-kt-resonance="sustain"] { animation: none; }
+}
 #memoryGrid .memBtn[data-kt-playing="example"] { --kt-slot-glow: #ffb557; }
 #memoryGrid .memBtn[data-kt-playing="played"] { --kt-slot-glow: #54debc; }
 @keyframes kt-slot-hit {
@@ -82,7 +101,7 @@ body.kt-practicing:not(.kt-running-round) #memoryGrid:not(.is-editing) .memBtn.f
 .kt-beats span.example { color: #1e170b; background: var(--kt-demo); border-color: var(--kt-demo); }
 .kt-beats span.played { color: #091f1b; background: var(--kt-player); border-color: var(--kt-player); }
 .kt-transport { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; }
-#ktClick[aria-pressed="true"] { border-color: rgba(29,185,84,.65); background: rgba(29,185,84,.16); }
+#ktClick[aria-pressed="true"], #ktLoop[aria-pressed="true"] { border-color: rgba(29,185,84,.65); background: rgba(29,185,84,.16); }
 #ktDemo { color: var(--kt-demo); }
 .kt-feedback { text-align: center; margin: 0; min-height: 1.45em; font-weight: 650; }
 .kt-feedback[data-kind="on"] { color: var(--kt-player); }

@@ -808,3 +808,77 @@ test('Memory slots pulse with Example and the graded chord, not the previewed ne
   assert.deepEqual(lit(),[['3','played']]);
   x.click('Stop'); assert.deepEqual(lit(),[]);
 });
+
+test('Memory-slot resonance follows held keys and overlapping pedal tails', async t => {
+  const x=await setup(t);
+  const state = slot => x.d.querySelector('#memoryGrid [data-slot="'+(slot-1)+'"]').dataset.ktResonance;
+  x.click('Open'); await x.midi(); await x.round();
+  x.at(3140); x.send(0xb0,64,127);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  await new Promise(resolve=>setTimeout(resolve,390));
+  assert.equal(state(1),'held');
+  x.at(3730);
+  assert.equal(state(1),'held');
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  assert.equal(state(1),'sustain');
+  x.at(5140);
+  for (const n of slots[1].midis) x.send(0x90,n,90);
+  for (const n of slots[1].midis) x.send(0x80,n,64);
+  assert.equal(state(4),'sustain');
+  x.at(6000);
+  x.send(0xb0,64,0);
+  assert.equal(state(1),undefined);
+  assert.equal(state(4),undefined);
+});
+test('The final slot remains sustained after natural completion until pedal-up', async t => {
+  const x=await setup(t,[slots[0]]);
+  const btn=x.d.querySelector('#memoryGrid [data-slot="0"]');
+  x.click('Open'); await x.midi(); await x.round();
+  x.at(3140); x.send(0xb0,64,127);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of slots[0].midis) x.send(0x80,n,64);
+  x.at(6900);
+  assert.equal(x.id('Stop').hidden,true);
+  assert.equal(btn.dataset.ktResonance,'sustain');
+  x.send(0xb0,64,0);
+  assert.equal(btn.dataset.ktResonance,undefined);
+});
+
+test('Loop repeats only included slots with uninterrupted, non-duplicated clicks until Stop', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi();
+  const skip=x.d.querySelector('#memoryGrid [data-slot="3"]');
+  skip.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+  x.click('Loop');
+  await x.round();
+  assert.equal(x.id('Loop').getAttribute('aria-pressed'),'true');
+  assert.equal(x.id('Loop').disabled,true);
+  for (const [time, entry] of [[3140,slots[0]], [5140,slots[2]], [7140,slots[0]], [9140,slots[2]], [11140,slots[0]]]) {
+    x.at(time);
+    assert.match(x.id('Chord').textContent,new RegExp('Slot '+entry.slot+' ·'));
+    for (const n of entry.midis) x.send(0x90,n,90);
+    for (const n of entry.midis) x.send(0x80,n,64);
+    assert.equal(x.id('Feedback').textContent,'On time');
+  }
+  const clicks=x.played.map(o=>Math.round(o.at*1000));
+  assert.equal(clicks.length,36);
+  assert.ok(clicks.slice(1).every((time,i)=>time-clicks[i]===500));
+  x.click('Stop');
+  assert.equal(x.id('Loop').disabled,false);
+  assert.equal(x.id('Stop').hidden,true);
+  assert.ok(x.played.every(o=>o.end===0));
+});
+test('Loop keeps Example finite and restarts a failed Practice pass with count-in', async t => {
+  const x=await setup(t,[slots[0]]);
+  x.click('Open'); x.click('Loop'); x.set('Tempo','120');
+  x.click('Demo'); await calm();
+  assert.equal(x.played.length,11);
+  x.at(5200);
+  assert.equal(x.id('Stop').hidden,true);
+  await x.midi(); await x.round();
+  x.at(7340);
+  x.send(0x90,61,80); x.send(0x80,61,64);
+  assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
+  assert.equal(x.id('Loop').getAttribute('aria-pressed'),'true');
+  x.click('Stop');
+});

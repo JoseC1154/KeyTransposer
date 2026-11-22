@@ -68,7 +68,7 @@
   const statusText = { on: "On time", wrong: "Wrong chord", miss: "Missed" };
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
   let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
-  const pedalDown = new Set(), sustained = new Map();
+  const pedalDown = new Set(), sustained = new Map(), heldAttacks = new Map();
   const sustainFadeMs = 2400;
   const liveVoices = new Map();
   const pianoSwitch = $("PianoSound");
@@ -175,6 +175,39 @@
   const open = () => !practice.hidden;
   const memoryGrid = document.getElementById("memoryGrid");
   const skippedBanks = new Map();
+  const resonatingSlots = new Map();
+  function syncSlotResonance() {
+    if (!resonatingSlots.size) return;
+    const live = new Set(heldAttacks.values());
+    const tails = new Map([...sustained.values()].map(note => [note.attack, note.time]));
+    for (const [slot, chord] of resonatingSlots) {
+      const down = [...chord.attacks].some(attack => live.has(attack));
+      const last = Math.max(-Infinity, ...[...chord.attacks].map(attack => tails.get(attack) ?? -Infinity));
+      const state = open() && chord.bank === api.bank() ? down ? "held" : Number.isFinite(last) ? "sustain" : "" : "";
+      const button = chord.button;
+      if (!state) {
+        if (button.dataset.ktResonance && glowSlot === slot) {
+          glowSlot = -1;
+          paintPlayingSlot(-1);
+        }
+        delete button.dataset.ktResonance;
+        button.style.removeProperty("--kt-slot-decay-delay");
+        resonatingSlots.delete(slot);
+      } else if (button.dataset.ktResonance !== state || (state === "sustain" && last !== chord.last)) {
+        button.dataset.ktResonance = state;
+        chord.last = last;
+        if (state === "sustain") button.style.setProperty("--kt-slot-decay-delay",
+          `-${clamp(performance.now() - last, 0, sustainFadeMs)}ms`);
+      }
+    }
+  }
+  function clearSlotResonance() {
+    for (const {button} of resonatingSlots.values()) {
+      delete button.dataset.ktResonance;
+      button.style.removeProperty("--kt-slot-decay-delay");
+    }
+    resonatingSlots.clear();
+  }
   let drag = null, suppressClick = null, litSlot = null;
   function paintPlayingSlot(slot, kind) {
     const next = slot > 0 ? memoryGrid.querySelector('[data-slot="' + (slot - 1) + '"]') : null;
@@ -324,6 +357,7 @@
   function announceMidi(message) { $("MidiStatus").textContent = message; }
   function paintKeys() {
     api.refresh();
+    syncSlotResonance();
     $("Play").disabled = !playingPicks()?.size || !sequence.length;
   }
   function syncHeld() {
@@ -402,7 +436,8 @@
       }
     }
   }
-  function stop(message = "") {
+  function stop(message = "", keepResonance = false) {
+    if (!keepResonance) clearSlotResonance();
     runId++;
     launchPending = false;
     cancelAnimationFrame(frame);
@@ -419,6 +454,7 @@
     $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
     $("Click").disabled = false;
+    $("Loop").disabled = false;
     $("Click").setAttribute("aria-pressed", "false");
     $("Click").textContent = "Metronome";
     refreshIdle();
@@ -440,6 +476,7 @@
     const skipped = skipSet();
     if (skipped) for (const slot of skipped) if (!chords[slot - 1]) skipped.delete(slot);
     paintSkipped(chords);
+    syncSlotResonance();
     const next = chords.filter(c => c && !skipped?.has(c.slot))
       .map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
     if (JSON.stringify(next) === JSON.stringify(sequence) && displayed >= 0) return;
@@ -587,7 +624,7 @@
     displaySlot(next < 0 ? plan.targets.length - 1 : next);
     return next;
   }
-  function result(data) {
+  function result(data, attacks) {
     const { target, result, delta } = data;
     if (result === "wrong") {
       startRound(false, statusText.wrong, "wrong");
@@ -600,8 +637,13 @@
     glowBeat = target.beat - 1;
     glowSlot = target.slot;
     paintPlayingSlot(glowSlot, "played");
+    if (attacks?.size && litSlot) {
+      resonatingSlots.set(glowSlot, { button: litSlot, attacks, bank: api.bank(), last: null });
+      syncSlotResonance();
+    }
     glowUntil = Math.max(performance.now(), target.time) + 340;
     feedback(label, "on");
+    if (active.loop && active.plan.targets.every(t => t.result)) advancePass(active);
     renderResults(active.plan);
     const next = updatePracticeGuide(active.plan);
     const index = Math.floor((performance.now() - active.plan.start) / active.plan.step);
@@ -609,10 +651,10 @@
     renderBeats(next < 0 ? -1 : active.plan.targets[next].beat - 1, pulse, false, glowBeat);
     return false;
   }
-  function submit(notes, first, last) {
+  function submit(notes, first, last, attacks) {
     if (!active || active.demo || active.listen) return;
     const scored = score(active.plan, notes, [], first, last);
-    if (scored) return result(scored);
+    if (scored) return result(scored, attacks);
     const target = active.plan.targets.find(t => !t.result);
     if (target && last >= target.deadline) {
       startRound(false, statusText.miss, "miss");
@@ -628,17 +670,18 @@
     const batch = attempt;
     attempt = null;
     clearTimeout(flushTimer);
-    submit([...batch.notes], batch.first, batch.last);
+    submit([...batch.notes], batch.first, batch.last, batch.attacks);
   }
   function processNote(msg, clock, velocity) {
     if (!msg.down) {
       const channel = Number(msg.key.split(":")[0]);
       const wasHeld = held.has(msg.key);
       if (wasHeld && pedalDown.has(channel)) {
-        sustained.set(msg.key, { note: msg.note, channel, time: performance.now() });
+        sustained.set(msg.key, { note: msg.note, channel, time: performance.now(), attack: heldAttacks.get(msg.key) });
         releaseLiveVoice(msg.key, sustainFadeMs / 1000);
       } else if (wasHeld) releaseLiveVoice(msg.key, .13);
       held.delete(msg.key);
+      heldAttacks.delete(msg.key);
       if (!held.size) {
         waitRelease = false;
         const target = active?.plan.targets.find(t => !t.result);
@@ -652,6 +695,8 @@
     if (held.has(msg.key) || document.hidden) return;
     sustained.delete(msg.key);
     held.set(msg.key, msg.note);
+    const attack = Symbol();
+    heldAttacks.set(msg.key, attack);
     startLiveVoice(msg.key, msg.note, velocity);
     syncHeld();
     if (!active || active.demo || active.listen || waitRelease) return;
@@ -663,11 +708,12 @@
     if (!attempt) {
       // Previously held keys don't count as a fresh attack.
       if (held.size > 1) { waitRelease = true; return; }
-      attempt = { first: clock, last: clock, notes: new Set() };
+      attempt = { first: clock, last: clock, notes: new Set(), attacks: new Set() };
       flushTimer = setTimeout(() => { flushAttempt(); waitRelease = held.size > 0; }, NOTE_SPREAD + 12);
     }
     attempt.last = Math.max(clock, attempt.last);
     attempt.notes.add(msg.note);
+    attempt.attacks.add(attack);
     // Let the short window finish so an unintended extra note cannot be ignored.
   }
   function tick() {
@@ -708,12 +754,39 @@
     if (now >= plan.end && (demo || !state)) {
       const good = plan.targets.filter(t => t.result === "on").length;
       const label = plan.targets.every(t => t.timing === "on") ? " on time" : " correct";
-      stop(demo ? "Ready to try?" : good + " of " + plan.targets.length + label);
+      stop(demo ? "Ready to try?" : good + " of " + plan.targets.length + label, !demo);
       return;
     }
     frame = requestAnimationFrame(tick);
   }
+  function buildPass(start, bpm, beat, meter, loop) {
+    const plan = makePlan(start, bpm, beat, sequence.length, meter);
+    plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
+    if (loop) {
+      const firstBeatOffset = (plan.targets[0].beat - 1) * plan.step;
+      plan.targets.at(-1).deadline = plan.end + firstBeatOffset;
+    }
+    return plan;
+  }
+  function queuePassClicks(plan, audioStart, first = 0) {
+    const total = (plan.targets.length + 1) * plan.count;
+    for (let i = first; i < total; i++) scheduleClick(plan, i, audioStart + i * plan.step / 1000);
+  }
+  function queueFollowingPass(session) {
+    const {plan, audioStart, bpm, beat, meter} = session;
+    const duration = plan.targets.length * plan.count * plan.step;
+    const next = buildPass(plan.start + duration, bpm, beat, meter, true);
+    const nextAudio = audioStart + duration / 1000;
+    queuePassClicks(next, nextAudio, next.count); // No extra count-in between successful passes.
+    session.following = {plan:next, audioStart:nextAudio};
+  }
+  function advancePass(session) {
+    Object.assign(session, session.following);
+    session.go = true;
+    queueFollowingPass(session);
+  }
   function startRound(demo, reason = "", kind = "") {
+    clearSlotResonance();
     cancelAnimationFrame(frame);
     resetAttempt();
     stopSound();
@@ -721,13 +794,13 @@
     paintPlayingSlot(-1);
     guideNotes = []; demoNotes = []; touchNotes = []; touchUntil = 0;
     const { audioStart, start } = clocks();
-    const plan = makePlan(start, practiceTempo(), hitMode(), sequence.length, $("Meter").value);
-    plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
-    active = { demo, plan, go: false, roundPicks: demo ? null : new Set() };
+    const bpm = practiceTempo(), beat = hitMode(), meter = $("Meter").value;
+    const loop = !demo && $("Loop").getAttribute("aria-pressed") === "true";
+    const plan = buildPass(start, bpm, beat, meter, loop);
+    active = { demo, loop, plan, audioStart, bpm, beat, meter, go: false, roundPicks: demo ? null : new Set() };
     renderResults(demo ? null : plan);
-    for (let i = 0; i < (plan.targets.length + 1) * plan.count; i++) {
-      scheduleClick(plan, i, audioStart + i * plan.step / 1000);
-    }
+    queuePassClicks(plan, audioStart);
+    if (loop) queueFollowingPass(active);
     if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
     feedback(reason ? reason + " · Count in again" : "Count in · 1 bar", kind);
     tick();
@@ -738,6 +811,7 @@
     const token = ++runId;
     launchPending = true;
     setRoundMode(demo ? "demo" : "practice");
+    $("Loop").disabled = true;
     paintKeys();
     lockExistingControls();
     $("Click").disabled = true;
@@ -763,7 +837,7 @@
     }
     port = null;
     stopLiveVoices();
-    held.clear(); clearSustain(); resetAttempt(); syncHeld();
+    held.clear(); heldAttacks.clear(); clearSustain(); resetAttempt(); syncHeld();
   }
   function refreshPorts() {
     if (!access) return;
@@ -873,6 +947,10 @@
     else api.capture(notes);
   });
   $("Click").addEventListener("click", listen);
+  $("Loop").addEventListener("click", () => {
+    const button = $("Loop");
+    button.setAttribute("aria-pressed", button.getAttribute("aria-pressed") === "true" ? "false" : "true");
+  });
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));
   $("Stop").addEventListener("click", () => stop("Stopped"));
@@ -899,6 +977,6 @@
     if (active || launchPending) stop("Paused when you left the tab");
     else stopSound();
     stopLiveVoices();
-    held.clear(); clearSustain(); resetAttempt(); syncHeld();
+    held.clear(); heldAttacks.clear(); clearSustain(); resetAttempt(); syncHeld();
   });
 })();
