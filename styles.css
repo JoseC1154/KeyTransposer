@@ -1017,3 +1017,27 @@ select{
     font-size: 12px;
   }
 }
+
+/* Chord memory editor */
+.slot-tools { display:flex; gap:8px; align-items:center; justify-content:space-between; color:var(--muted); font-size:.85rem; font-weight:700; }
+#slotActionStatus { margin-left:auto; font-weight:500; text-align:right; overflow-wrap:anywhere; }
+#slotEdit { flex:none; }
+#slotEdit[aria-pressed="true"] { color:var(--text); border-color:rgba(29,185,84,.65); background:rgba(29,185,84,.16); }
+#slotEditor {
+  width:min(420px, calc(100% - 24px)); color:var(--text); background:#202020;
+  border:1px solid rgba(255,255,255,.20); border-radius:16px; padding:16px;
+}
+#slotEditor::backdrop { background:rgba(0,0,0,.65); backdrop-filter:blur(4px); }
+.slot-editor-head, .slot-editor-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.slot-editor-head h2 { margin:0; font-size:1.1rem; }
+#slotEditorCurrent, #slotEditorMessage { color:var(--muted); margin:8px 0; overflow-wrap:anywhere; }
+#slotEditorMessage:empty { margin:0; }
+.slot-editor-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.slot-editor-actions .ctrl { height:42px; font-size:.9rem; }
+.slot-editor-actions .ctrl:disabled { opacity:.4; cursor:default; }
+#slotEditorConfirm { display:grid; gap:10px; margin:10px 0 4px; }
+#slotEditorNameLabel { display:grid; gap:4px; color:var(--muted); }
+#slotEditorName {
+  min-width:0; padding:8px; font:inherit; color:var(--text);
+  background:#292929; border:1px solid rgba(255,255,255,.28); border-radius:8px;
+}

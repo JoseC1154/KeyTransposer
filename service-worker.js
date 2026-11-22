@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v8-meters-memory";
+const CACHE_NAME = "piano-transposer-v9-chord-slot-editor";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./js/chordAlternates.js",
   "./js/main.js",
   "./js/practice.js",
+  "./js/memory-editor.js",
   "./js/practice.css",
   "./manifest.json",
   "./service-worker.js",

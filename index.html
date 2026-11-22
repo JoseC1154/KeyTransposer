@@ -107,6 +107,11 @@
         </div>
       </div>
 
+      <div class="slot-tools">
+        <span>Chord Memory</span>
+        <span id="slotActionStatus" role="status"></span>
+        <button class="ghost" id="slotEdit" type="button" aria-pressed="false">Edit</button>
+      </div>
       <div class="memoryStrip" id="memoryGrid" role="group" aria-label="12 chord memory slots">
         <button class="memBtn" type="button" data-slot="0" aria-label="Memory slot 1">1</button>
         <button class="memBtn" type="button" data-slot="1" aria-label="Memory slot 2">2</button>
@@ -128,6 +133,30 @@
     </footer>
 
   </main>
+  <dialog id="slotEditor" aria-labelledby="slotEditorTitle">
+    <div class="slot-editor-head">
+      <h2 id="slotEditorTitle">Memory slot</h2>
+      <button class="ghost" id="slotEditorClose" type="button" aria-label="Close slot editor">×</button>
+    </div>
+    <p id="slotEditorCurrent"></p>
+    <div class="slot-editor-actions">
+      <button class="ctrl mini accent" data-slot-action="save" type="button">Save</button>
+      <button class="ctrl mini" data-slot-action="rename" type="button">Rename</button>
+      <button class="ctrl mini" data-slot-action="copy" type="button">Copy</button>
+      <button class="ctrl mini" data-slot-action="cut" type="button">Cut</button>
+      <button class="ctrl mini" data-slot-action="paste" type="button">Paste</button>
+      <button class="ctrl mini" data-slot-action="clear" type="button">Clear</button>
+    </div>
+    <form id="slotEditorConfirm" hidden>
+      <label id="slotEditorNameLabel">Chord name <input id="slotEditorName" type="text" maxlength="80"></label>
+      <div class="slot-editor-footer">
+        <button class="ghost" id="slotEditorBack" type="button">Back</button>
+        <button class="ghost" id="slotEditorSubmit" type="submit">Confirm</button>
+      </div>
+    </form>
+    <p id="slotEditorMessage" role="status"></p>
+  </dialog>
+
   <dialog id="ktMidiDialog" aria-labelledby="ktMidiTitle">
     <form method="dialog" class="kt-dialog-head">
       <h2 id="ktMidiTitle">MIDI keyboard</h2>
@@ -328,5 +357,6 @@
   <script src="js/chordAlternates.js"></script>
   <script src="js/main.js"></script>
   <script src="js/practice.js"></script>
+  <script src="js/memory-editor.js"></script>
 </body>
 </html>

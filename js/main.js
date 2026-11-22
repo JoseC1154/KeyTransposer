@@ -949,6 +949,7 @@ if (elMemoryGrid) {
     btn.addEventListener("click", () => {
       if (savingPracticeChord) return;
       const i = Number(btn.dataset.slot);
+      if (window.KTSlotEditor?.openSlot(currentScalePc, i)) return;
       const practicing = window.KTPractice?.isOpen();
       const practiceNotes = practicing ? window.KTPractice.notesForSlot() || [...selectedMidis] : null;
       if (practicing) window.KTPractice.beforeSlot();
@@ -1343,6 +1344,31 @@ if ("serviceWorker" in navigator) {
 }
 
 // A deliberate capture only; MIDI preview never overwrites saved slots.
+window.KTChordMemory = {
+  get: getSlot,
+  bankName: bank => NOTES_SHARP[bank],
+  notesToSave: () => window.KTPractice?.notesForSlot() || [...selectedMidis],
+  nameFor: notes => detectChordNameFromMidis(notes) || "",
+  prepareEdit: () => window.KTPractice?.beforeSlot(),
+  commit(changes) {
+    const next = bankChords.map(bank => bank.slice());
+    for (const { bank, slot, value } of changes) next[bank][slot] = value;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({currentScalePc, bankChords: next}));
+    } catch {
+      return false;
+    }
+    bankChords = next;
+    if (changes.some(({ bank, slot }) => bank === activeBankPc && slot === activeSlot)) {
+      activeSlot = activeBankPc = -1;
+      updateHint();
+    }
+    renderMemoryButtons();
+    syncMemoryModalGrid();
+    return true;
+  }
+};
+
 window.KTTransposer = {
   selection: () => ({ notes: [...selectedMidis], name: activeChordName }),
   chords: () => bankChords[currentScalePc].map((slot, i) => slot && ({ notes: slot.midis.slice(), name: slot.name, slot: i + 1 })),
