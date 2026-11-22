@@ -484,12 +484,12 @@ body::before{
 .key.white:active{ transform: translateY(1px) scale(0.995); }
 .key.black:active{ transform: none; }
 
-.key.selected.white{
+.key:is(.selected, .kt-pick).white{
   background: linear-gradient(180deg, #eafff1, #bff3d1);
   box-shadow: 0 0 0 3px rgba(29,185,84,0.45), inset 0 -7px 15px rgba(0,0,0,0.15);
 }
 
-.key.selected.black{
+.key:is(.selected, .kt-pick).black{
   background: linear-gradient(180deg, #1f6b3b, #0b2d17);
   box-shadow: 0 0 0 3px rgba(29,185,84,0.45), 0 10px 20px rgba(0,0,0,0.55);
 }
@@ -508,7 +508,7 @@ body::before{
 }
 .key.black .noteLabel{ background: rgba(255,255,255,0.10); }
 
-.key.selected .noteLabel{
+.key:is(.selected, .kt-pick) .noteLabel{
   opacity: 1;
   transform: translateY(0);
 }
@@ -1041,3 +1041,7 @@ select{
   min-width:0; padding:8px; font:inherit; color:var(--text);
   background:#292929; border:1px solid rgba(255,255,255,.28); border-radius:8px;
 }
+
+#memoryGrid.is-editing .memBtn { border-style: dashed; }
+#memoryGrid.is-editing .memBtn:hover, #memoryGrid.is-editing .memBtn:focus-visible { border-color: var(--accent); }
+.slot-editor-actions [data-slot-action="load"] { grid-column: 1 / -1; }

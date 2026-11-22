@@ -41,7 +41,7 @@ The app is designed to feel like a native tool:
 
 ## Editing chord memory
 
-Turn on **Edit**, then tap a numbered slot. **Save** stores the selected notes, **Rename** keeps the voicing, and **Clear** asks before removing it. **Copy** or **Cut**, then open the destination slot and choose **Paste**. Paste keeps the same notes, even in a different scale bank. Cut only clears its original slot once the destination saves. Turn off Edit to go back to normal slot taps.
+Turn on **Edit**, then tap a numbered slot. **Load notes** brings a saved voicing to the keyboard without leaving Edit. Change the green notes, tap the slot again, and **Save**; **Rename** keeps the voicing, and **Clear** asks before removing it. **Copy** or **Cut**, then open the destination slot and choose **Paste**. Paste keeps the same notes, even in a different scale bank. Cut only clears its original slot once the destination saves. Turn off Edit to go back to normal slot taps.
 
 ## MIDI and Practice
 

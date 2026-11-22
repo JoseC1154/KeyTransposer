@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v10-audible-metronome";
+const CACHE_NAME = "piano-transposer-v11-edit-voicings";
 const ASSETS = [
   "./",
   "./index.html",

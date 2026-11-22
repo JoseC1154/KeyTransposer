@@ -151,6 +151,7 @@ function initApp() {
   if (btnClear) {
     btnClear.addEventListener("click", () => {
       selectedMidis.clear();
+      window.KTPractice?.slotLoaded([]);
       activeSlot = -1;
       activeBankPc = -1;
       setChordName("");
@@ -1350,6 +1351,16 @@ window.KTChordMemory = {
   notesToSave: () => window.KTPractice?.notesForSlot() || [...selectedMidis],
   nameFor: notes => detectChordNameFromMidis(notes) || "",
   prepareEdit: () => window.KTPractice?.beforeSlot(),
+  load(bank, slot) {
+    const chord = getSlot(bank, slot);
+    if (!chord || bank !== currentScalePc) return false;
+    activeBankPc = bank;
+    activeSlot = slot;
+    loadSlot(slot);
+    window.KTPractice?.slotLoaded([...selectedMidis]);
+    renderMemoryButtons();
+    return true;
+  },
   commit(changes) {
     const next = bankChords.map(bank => bank.slice());
     for (const { bank, slot, value } of changes) next[bank][slot] = value;

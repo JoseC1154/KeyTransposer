@@ -360,3 +360,22 @@ test('Listening does not burst after a delayed frame and closing Practice stops 
   x.click('Open'); await x.round();
   assert.equal(x.id('Click').disabled,true);
 });
+test('Load notes, edit a saved voicing and replace it without leaving Edit mode', async t => {
+  const x=await setup(t), e=editHarness(x);
+  x.click('Open');
+  e.toggle(); e.slot(1); e.act('load');
+  assert.equal(e.$('slotEditor').open,false);
+  assert.equal(e.$('slotEdit').getAttribute('aria-pressed'),'true');
+  assert.equal(e.$('memoryGrid').classList.contains('is-editing'),true);
+  const picked = () => [...x.piano.querySelectorAll('.kt-pick')].map(el=>Number(el.dataset.midi)).sort((a,b)=>a-b);
+  assert.deepEqual(picked(),[60,64,67]);
+  x.tap(64); x.tap(63);
+  e.slot(1); e.act('save');
+  assert.equal(e.$('slotEditorName').value,'C major');
+  e.submit();
+  assert.deepEqual(e.saved(1).midis,[60,63,67]);
+  e.$('btnClear').click();
+  assert.deepEqual(picked(),[]);
+  e.toggle();
+  assert.equal(e.$('memoryGrid').classList.contains('is-editing'),false);
+});

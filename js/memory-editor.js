@@ -30,7 +30,7 @@
     const chord = get(current);
     $("slotEditorTitle").textContent = label(current);
     $("slotEditorCurrent").textContent = chord ? chord.name || "Unnamed chord" : "Empty";
-    for (const key of ["rename", "copy", "cut", "clear"]) buttons[key].disabled = !chord;
+    for (const key of ["load", "rename", "copy", "cut", "clear"]) buttons[key].disabled = !chord;
     buttons.save.disabled = !current.notes.length;
     buttons.paste.disabled = !clipboard || (clipboard.kind === "cut" && sameSlot(clipboard.location, current));
     say(clipboard ? recommendTarget() : "");
@@ -77,6 +77,12 @@
     enabled = !enabled;
     edit.setAttribute("aria-pressed", String(enabled));
     edit.textContent = enabled ? "Done" : "Edit";
+    const grid = $("memoryGrid");
+    grid.classList.toggle("is-editing", enabled);
+    for (const button of grid.querySelectorAll("button[data-slot]")) {
+      if (enabled) button.setAttribute("aria-haspopup", "dialog");
+      else button.removeAttribute("aria-haspopup");
+    }
     if (!enabled) clipboard = null;
     $("slotActionStatus").textContent = enabled ? "Choose a slot." : "";
   });
@@ -89,7 +95,10 @@
     if (!button || button.disabled || !current) return;
     const {slotAction: kind} = button.dataset;
     const stored = get(current);
-    if (kind === "copy" || kind === "cut") {
+    if (kind === "load") {
+      if (api.load(current.bank, current.slot)) close("Loaded " + label(current) + ". Edit the notes, then save.");
+      else say("Could not load this slot.");
+    } else if (kind === "copy" || kind === "cut") {
       clipboard = {
         kind, location: {bank:current.bank, slot:current.slot},
         source: stored, value: {midis:stored.midis.slice(), name:stored.name},
@@ -97,7 +106,7 @@
       close(recommendTarget());
     } else if (kind === "save") {
       const text = stored ? "Replace this saved chord with the selected notes?" : "Save the selected notes here.";
-      begin(kind,{midis:current.notes,name:api.nameFor(current.notes)}, text, stored ? "Replace" : "Save");
+      begin(kind,{midis:current.notes,name:stored?.name || api.nameFor(current.notes)}, text, stored ? "Replace" : "Save");
     } else if (kind === "rename") {
       begin(kind,{midis:stored.midis.slice(),name:stored.name},"", "Save name");
     } else if (kind === "clear") {

@@ -50,7 +50,6 @@
 .kt-results span { display: grid; place-items: center; width: min(23px, 7%); height: 22px; border: 1px solid #55617b; border-radius: 5px; color: var(--kt-muted); font-size: .74rem; }
 .kt-results span.on { background: var(--kt-player); color: #081e18; border-color: transparent; }
 .kt-results span.early, .kt-results span.late { background: #ffd293; color: #201606; border-color: transparent; }
-body.kt-practicing #piano .key.kt-pick { background: #b2c1ef; color: #181c2d; }
 body.kt-practicing #piano .key.kt-example { background: #ffb557; color: #201606; }
 body.kt-practicing #piano .key.kt-midi-held, body.kt-practicing #piano .key.kt-player { background: #54debc; color: #092019; }
 body.kt-practicing #piano .key.kt-example .noteLabel,
