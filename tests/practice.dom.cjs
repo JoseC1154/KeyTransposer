@@ -35,7 +35,7 @@ async function setup(t, entries = slots) {
   class Audio {
     state = 'running';
     get currentTime() { return audioClock; }
-    createGain() { return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}}; }
+    createGain() { return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){},cancelScheduledValues(){}},connect(){},disconnect(){}}; }
     createOscillator() {
       return {frequency:{value:0},connect(){},disconnect(){},end:Infinity,
         start(at){this.at=at; played.push(this);},
@@ -133,7 +133,7 @@ test('One existing keyboard is reused and practice leaves the transposer selecti
   const saved = x.w.localStorage.getItem('pct_state_v1');
   const original = x.piano.querySelector('[data-midi="60"]');
   x.click('Open'); x.tap(60);
-  assert.equal(x.d.querySelectorAll('[aria-label="Piano keyboard"]').length,1);
+  assert.equal(x.d.querySelectorAll('#piano').length,1);
   assert.equal(x.piano.querySelector('[data-midi="60"]'),original);
   assert.equal(original.classList.contains('kt-pick'),true);
   assert.deepEqual([...x.w.KTTransposer.selection().notes],[70]);
@@ -415,4 +415,96 @@ test('Transpose changes the actual Practice selection and save uses the shifted 
   e.toggle();
   e.slot(2);
   assert.deepEqual([...x.w.KTTransposer.selection().notes],[61,65,68]);
+});
+
+test('MIDI keyboard sizes resize the same piano without changing stored chords or octaves', async t => {
+  const x = await setup(t);
+  const bank = x.w.localStorage.getItem('pct_state_v1');
+  function range(first, last) {
+    assert.deepEqual([...x.piano.querySelectorAll('.key')].map(k => Number(k.dataset.midi)).sort((a,b)=>a-b),
+      Array.from({length:last-first+1}, (_,i)=>first+i));
+  }
+  assert.equal(x.id('SizeLabel').hidden,true);
+  range(21,108);
+  await x.midi();
+  assert.equal(x.id('SizeLabel').hidden,false);
+  for (const [size, first, last] of [[25,48,72],[32,41,72],[37,48,84],[49,36,84],[73,28,100],[76,28,103],[88,21,108],[61,36,96]]) {
+    x.set('Size',String(size));
+    range(first,last);
+  }
+  assert.match(x.piano.getAttribute('aria-label'),/61 keys/);
+  x.send(0x90,36,90); x.send(0x90,96,90);
+  assert.deepEqual([...x.piano.querySelectorAll('.kt-midi-held')].map(k=>Number(k.dataset.midi)),[36,96]);
+  x.click('Disconnect');
+  range(21,108);
+  assert.equal(x.id('SizeLabel').hidden,true);
+  await x.midi();
+  range(36,96);
+  assert.equal(x.w.localStorage.getItem('kt_midi_keyboard_size_v1'),'61');
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),bank);
+});
+test('Sustain fades released keys without adding them to capture, and pedal-off clears the tail', async t => {
+  const x=await setup(t);
+  await x.midi();
+  const key=n=>x.piano.querySelector('[data-midi="'+n+'"]');
+  x.send(0xb0,64,127);
+  x.send(0x90,61,92);
+  assert.equal(key(61).classList.contains('kt-midi-held'),true);
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),false);
+  x.send(0x90,61,0);
+  assert.equal(key(61).classList.contains('kt-midi-held'),false);
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),true);
+  assert.equal(x.id('Capture').disabled,true);
+  x.at(1300);
+  x.w.dispatchEvent(new x.w.Event('resize'));
+  assert.equal(key(61).style.getPropertyValue('--kt-sustain-delay'),'-300ms');
+  x.send(0x91,63,92); x.send(0x81,63,64);
+  assert.equal(key(63).classList.contains('kt-midi-sustain'),false);
+  x.send(0xb1,64,0);
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),true);
+  x.send(0xb0,64,0);
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),false);
+  x.send(0xb0,64,127); x.send(0x90,61,90); x.send(0x80,61,64);
+  x.send(0x90,61,90);
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),false);
+  assert.equal(key(61).classList.contains('kt-midi-held'),true);
+  x.send(0x80,61,64);
+  x.click('Disconnect');
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),false);
+});
+test('Sustained previous chord does not prevent matching the next attack', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  x.send(0xb0,64,127);
+  for (const [time, {midis}] of [[3140,slots[0]],[5140,slots[1]]]) {
+    x.at(time);
+    for (const n of midis) x.send(0x90,n,90);
+    for (const n of midis) x.send(0x80,n,60);
+  }
+  assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: On time');
+  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: On time');
+});
+
+test('Optional live piano is silent by default, releases with pedal, and disconnect cuts sound', async t => {
+  const x=await setup(t);
+  await x.midi();
+  x.send(0x90,60,94); x.send(0x80,60,64);
+  assert.equal(x.played.length,0);
+  x.click('Midi');
+  x.click('PianoSound'); await calm();
+  // Can listen immediately while the settings are open.
+  x.send(0xb0,64,127); x.send(0x90,60,94);
+  assert.equal(x.played.length,3);
+  assert.ok(Math.abs(x.played[0].frequency.value - 261.626) < .01);
+  assert.equal(x.played[0].end,Infinity);
+  x.send(0x80,60,64);
+  assert.ok(Math.abs(x.played[0].end-5.415) < .001);
+  assert.equal(x.piano.querySelectorAll('.kt-midi-sustain').length,1);
+  x.setAudio(4); x.send(0xb0,64,0);
+  assert.ok(Math.abs(x.played[0].end-4.115) < .001);
+  assert.equal(x.piano.querySelectorAll('.kt-midi-sustain').length,0);
+  x.send(0x90,61,80);
+  x.click('Disconnect');
+  assert.equal(x.id('PianoSound').checked,false);
+  assert.ok(x.played.slice(3).every(o=>o.end<4.1));
 });

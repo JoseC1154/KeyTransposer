@@ -10,6 +10,28 @@ const MAX_OCTAVES = 7;
 // Octaves controls viewport/visible area sizing
 let octaves = 4;
 
+// Display only: chord memory and MIDI note numbers always retain their original pitches.
+const midiLayoutStarts = new Map([[25,48], [32,41], [37,48], [49,36], [61,36], [73,28], [76,28], [88,21]]);
+let midiLayoutSize = null;
+function displayRange() {
+  if (midiLayoutSize === null) return rangeMidis();
+  const min = midiLayoutStarts.get(midiLayoutSize);
+  return { min, max: min + midiLayoutSize - 1 };
+}
+function isBlackKey(note) {
+  return IS_BLACK.has(midiToPitchClass(note));
+}
+function setMidiLayout(size) {
+  const next = midiLayoutStarts.has(size) ? size : null;
+  if (next === midiLayoutSize) return;
+  midiLayoutSize = next;
+  applyResponsiveSizing();
+  renderPiano();
+  updateSelectionUI();
+  updateHeader();
+  if (elPianoScroll) elPianoScroll.scrollLeft = 0;
+}
+
 let selectedMidis = new Set();
 
 let elPiano;
@@ -1131,18 +1153,20 @@ function rebuild() {
 
 
 function updateHeader() {
-  const { min, max } = rangeMidis();
-  if (elRangeText) elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)} (88 keys)`;
+  const { min, max } = displayRange();
+  if (elRangeText) elRangeText.textContent = `Range: ${midiToNote(min)} → ${midiToNote(max)} (${max - min + 1} keys)`;
   if (elOctaveText) elOctaveText.textContent = `${octaves}`;
 }
 
 function applyResponsiveSizing() {
-  // Strategy:
-  // - Keys are sized based on the viewport octave count for comfortable viewing
-  // - All 88 keys are always rendered and can be scrolled through
-  // - Viewport shows the selected number of octaves at a comfortable size
-
-  const viewportWhiteCount = octaves * 7; // 7 white keys per octave
+  // Fit the selected MIDI layout where space permits; keep a usable key width
+  // and let the shared keyboard scroll on narrow screens.
+  let viewportWhiteCount = octaves * 7;
+  if (midiLayoutSize !== null) {
+    const { min, max } = displayRange();
+    viewportWhiteCount = 0;
+    for (let n = min; n <= max; n++) if (!isBlackKey(n)) viewportWhiteCount++;
+  }
   const rs = getComputedStyle(document.documentElement);
   const gap = parseFloat(rs.getPropertyValue("--gap")) || 2;
 
@@ -1200,15 +1224,13 @@ function renderPiano() {
   }
   elPiano.innerHTML = "";
 
-  // Always render all 88 keys
   const keys = [];
   let whiteIndex = 0;
+  const { min, max } = displayRange();
+  elPiano.setAttribute("aria-label", `Piano keyboard, ${max - min + 1} keys, ${midiToNote(min)} to ${midiToNote(max)}`);
 
-  for (let midi = PIANO_START_MIDI; midi < PIANO_END_MIDI; midi++) {
-    const pc = midiToPitchClass(midi);
-    const isBlack = IS_BLACK.has(pc);
-
-    if (!isBlack) {
+  for (let midi = min; midi <= max; midi++) {
+    if (!isBlackKey(midi)) {
       keys.push({ midi, isBlack: false, whiteIndex });
       whiteIndex++;
     } else {
@@ -1360,6 +1382,7 @@ window.KTChordMemory = {
 };
 
 window.KTTransposer = {
+  setMidiLayout,
   selection: () => ({ notes: [...selectedMidis], name: activeChordName }),
   chords: () => bankChords[currentScalePc].map((slot, i) => slot && ({ notes: slot.midis.slice(), name: slot.name, slot: i + 1 })),
   capture(notes) {

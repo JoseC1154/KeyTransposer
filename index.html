@@ -168,6 +168,19 @@
     <div class="kt-midi-controls">
       <button class="ghost" id="ktConnect" type="button">Connect MIDI</button>
       <label id="ktPortLabel" hidden>Input <select id="ktPort"></select></label>
+      <label id="ktSizeLabel" hidden>Keyboard size
+        <select id="ktSize">
+          <option value="25">25 keys</option>
+          <option value="32">32 keys</option>
+          <option value="37">37 keys</option>
+          <option value="49">49 keys</option>
+          <option value="61">61 keys</option>
+          <option value="73">73 keys</option>
+          <option value="76">76 keys</option>
+          <option value="88" selected>88 keys</option>
+        </select>
+      </label>
+      <label id="ktPianoSoundLabel" class="kt-sound-switch" hidden><input id="ktPianoSound" type="checkbox"> Piano sound</label>
       <button class="ghost" id="ktDisconnect" type="button" hidden>Disconnect</button>
     </div>
   </dialog>

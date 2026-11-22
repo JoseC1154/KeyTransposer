@@ -54,7 +54,114 @@
   const statusText = { on: "On time", early: "Early", late: "Late", wrong: "Wrong chord", miss: "Missed" };
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
   let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
+  const pedalDown = new Set(), sustained = new Map();
+  const sustainFadeMs = 2400;
+  let sustainTimer = 0;
+  const liveVoices = new Map();
+  const pianoSwitch = $("PianoSound");
+  let pianoSound = false, soundRequest = 0;
+
+  // Live MIDI sound is separate from the example and metronome transport.
+  function startLiveVoice(id, note, velocity) {
+    if (!pianoSound || audio?.state !== "running") return;
+    releaseLiveVoice(id, .055);
+    const when = audio.currentTime, gain = audio.createGain();
+    const peak = Math.max(.0002, .115 * (velocity / 127) ** 1.35);
+    const partials = [["triangle", 1, .7], ["sine", 2, .2], ["sine", 3, .1]];
+    const nodes = [];
+    for (const [type, multiplier, volume] of partials) {
+      const hz = 440 * 2 ** ((note - 69) / 12) * multiplier;
+      if (hz > 16000) continue;
+      const osc = audio.createOscillator(), partial = audio.createGain();
+      osc.type = type;
+      osc.frequency.value = hz;
+      partial.gain.setValueAtTime(volume, when);
+      osc.connect(partial); partial.connect(gain);
+      nodes.push({ osc, partial });
+      osc.start(when);
+    }
+    gain.connect(audio.destination);
+    gain.gain.setValueAtTime(.0001, when);
+    gain.gain.exponentialRampToValueAtTime(peak, when + .008);
+    gain.gain.exponentialRampToValueAtTime(Math.max(.0001, peak * .13), when + 3.5);
+    const voice = { gain, nodes, when, peak, tail: null };
+    liveVoices.set(id, voice);
+    // Release is normally scheduled by the controller, not by the practice clock.
+  }
+
+  function releaseLiveVoice(id, seconds) {
+    const voice = liveVoices.get(id);
+    if (!voice) return;
+    const time = audio.currentTime, { gain, when, peak, nodes, tail } = voice;
+    const elapsed = Math.max(0, time - when);
+    const value = tail
+      ? tail.value * (.0001 / tail.value) ** clamp((time - tail.time) / tail.seconds, 0, 1)
+      : elapsed < .008
+        ? .0001 * (peak / .0001) ** (elapsed / .008)
+        : peak * (Math.max(.0001, peak * .13) / peak) ** clamp((elapsed - .008) / 3.492, 0, 1);
+    const level = Math.max(.0001, value);
+    gain.gain.cancelScheduledValues(time);
+    gain.gain.setValueAtTime(level, time);
+    gain.gain.exponentialRampToValueAtTime(.0001, time + seconds);
+    voice.tail = { time, value: level, seconds };
+    for (const node of nodes) {
+      node.osc.onended = () => {
+        node.ended = true;
+        node.osc.disconnect(); node.partial.disconnect();
+        if (nodes.every(n => n.ended)) {
+          gain.disconnect();
+          if (liveVoices.get(id) === voice) liveVoices.delete(id);
+        }
+      };
+      if (!node.ended) node.osc.stop(time + seconds + .015);
+    }
+  }
+
+  function stopLiveVoices() {
+    for (const id of liveVoices.keys()) releaseLiveVoice(id, .045);
+    liveVoices.clear();
+  }
+  function scheduleSustainCleanup() {
+    clearTimeout(sustainTimer);
+    if (!sustained.size) return;
+    const firstEnd = Math.min(...[...sustained.values()].map(entry => entry.time + sustainFadeMs));
+    sustainTimer = setTimeout(() => {
+      const now = performance.now();
+      for (const [id, entry] of sustained) if (now - entry.time >= sustainFadeMs) sustained.delete(id);
+      paintKeys();
+      scheduleSustainCleanup();
+    }, Math.max(1, Math.ceil(firstEnd - performance.now())));
+  }
+  function clearSustain() {
+    clearTimeout(sustainTimer);
+    pedalDown.clear();
+    sustained.clear();
+  }
+  function processPedal(data) {
+    if (data?.length !== 3 || (data[0] & 240) !== 176 || data[1] !== 64) return;
+    if (document.hidden) return;
+    const channel = data[0] & 15;
+    if (data[2] >= 64) pedalDown.add(channel);
+    else {
+      pedalDown.delete(channel);
+      for (const [id, entry] of sustained) if (entry.channel === channel) {
+        releaseLiveVoice(id, .10);
+        sustained.delete(id);
+      }
+      scheduleSustainCleanup();
+      paintKeys();
+    }
+  }
   let access = null, port = null, desired = "", failedPort = null, midiEpoch = 0, portEpoch = 0;
+  const midiSize = $("Size"), midiSizePref = "kt_midi_keyboard_size_v1";
+  try {
+    const saved = localStorage.getItem(midiSizePref);
+    if ([...midiSize.options].some(option => option.value === saved)) midiSize.value = saved;
+  } catch {}
+  function syncMidiLayout() {
+    $("PianoSoundLabel").hidden = $("SizeLabel").hidden = !port;
+    api.setMidiLayout(port ? Number(midiSize.value) : null);
+  }
   let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
   const lockedControls = new Set();
@@ -88,6 +195,18 @@
       return true;
     },
     paintKey(key, n) {
+      let releasedAt = -Infinity;
+      if (!midiHeld(n)) {
+        for (const tail of sustained.values()) if (tail.note === n) releasedAt = Math.max(releasedAt, tail.time);
+      }
+      const elapsed = performance.now() - releasedAt;
+      const showTail = elapsed < sustainFadeMs;
+      if (showTail && key.dataset.ktRelease !== String(releasedAt)) {
+        key.style.setProperty("--kt-sustain-delay", `-${Math.max(0, elapsed)}ms`);
+        key.dataset.ktRelease = String(releasedAt);
+      }
+      if (!showTail) delete key.dataset.ktRelease;
+      key.classList.toggle("kt-midi-sustain", showTail);
       key.classList.toggle("kt-pick", open() && picked.has(n));
       key.classList.toggle("kt-example", open() && demoNotes.includes(n));
       key.classList.toggle("kt-player", open() && performance.now() < touchUntil && touchNotes.includes(n));
@@ -336,8 +455,15 @@
     clearTimeout(flushTimer);
     submit([...batch.notes], batch.first, batch.last);
   }
-  function processNote(msg, clock) {
+  function processNote(msg, clock, velocity) {
     if (!msg.down) {
+      const channel = Number(msg.key.split(":")[0]);
+      const wasHeld = held.has(msg.key);
+      if (wasHeld && pedalDown.has(channel)) {
+        sustained.set(msg.key, { note: msg.note, channel, time: performance.now() });
+        scheduleSustainCleanup();
+        releaseLiveVoice(msg.key, sustainFadeMs / 1000);
+      } else if (wasHeld) releaseLiveVoice(msg.key, .13);
       held.delete(msg.key);
       if (!held.size) {
         waitRelease = false;
@@ -346,8 +472,10 @@
       syncHeld();
       return;
     }
-    if (held.has(msg.key) || document.hidden || dialog.open) return;
+    if (held.has(msg.key) || document.hidden) return;
+    sustained.delete(msg.key);
     held.set(msg.key, msg.note);
+    startLiveVoice(msg.key, msg.note, velocity);
     syncHeld();
     if (!active || active.demo || active.listen || waitRelease) return;
     if (attempt && clock - attempt.first > NOTE_SPREAD) {
@@ -448,7 +576,8 @@
       try { Promise.resolve(port.close()).catch(() => {}); } catch {}
     }
     port = null;
-    held.clear(); resetAttempt(); syncHeld();
+    stopLiveVoices();
+    held.clear(); clearSustain(); resetAttempt(); syncHeld();
   }
   function refreshPorts() {
     if (!access) return;
@@ -465,17 +594,20 @@
     detach();
     if (previous && active && !active.demo && !active.listen) stop("MIDI input changed");
     if (!next || next === failedPort) {
+      syncMidiLayout();
       announceMidi(next ? "Could not open input. Reconnect to try again." : desired ? "Input disconnected" : "No MIDI keyboard found");
       return;
     }
     port = next;
+    syncMidiLayout();
     const epoch = midiEpoch, binding = portEpoch;
     const stillCurrent = () => epoch === midiEpoch && binding === portEpoch && port === next;
     next.onmidimessage = event => {
       if (!stillCurrent() || next.state !== "connected") return;
       const msg = midiMessage(event.data);
       const now = performance.now(), stamp = event.timeStamp;
-      if (msg) processNote(msg, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now);
+      if (msg) processNote(msg, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now, event.data[2]);
+      else processPedal(event.data);
     };
     announceMidi("Connected: " + (next.name || "MIDI keyboard"));
     Promise.resolve().then(() => stillCurrent() && next.open()).catch(() => {
@@ -488,8 +620,11 @@
     midiEpoch++;
     if (access) access.onstatechange = null;
     access = null; desired = ""; failedPort = null;
+    pianoSound = pianoSwitch.checked = false;
+    soundRequest++;
     if (active && !active.demo && !active.listen) stop("MIDI disconnected");
     detach();
+    syncMidiLayout();
     $("PortLabel").hidden = $("Disconnect").hidden = true;
     $("Connect").disabled = false;
     announceMidi("Not connected");
@@ -523,6 +658,27 @@
   $("Connect").addEventListener("click", connect);
   $("Disconnect").addEventListener("click", disconnect);
   $("Port").addEventListener("change", () => { desired = $("Port").value; failedPort = null; refreshPorts(); });
+  pianoSwitch.addEventListener("change", async () => {
+    const request = ++soundRequest;
+    if (!pianoSwitch.checked) {
+      pianoSound = false;
+      stopLiveVoices();
+      return;
+    }
+    try {
+      await unlockAudio();
+      if (request === soundRequest && port) pianoSound = true;
+    } catch {
+      if (request !== soundRequest) return;
+      pianoSwitch.checked = false;
+      announceMidi("Piano sound unavailable. Try turning it on again.");
+    }
+  });
+  midiSize.addEventListener("change", () => {
+    if (!port || !midiSize.value) return;
+    try { localStorage.setItem(midiSizePref, midiSize.value); } catch {}
+    syncMidiLayout();
+  });
   $("Capture").addEventListener("click", () => {
     const notes = uniqueNotes(heldNotes());
     if (!notes.length) return;
@@ -555,6 +711,7 @@
     if (!document.hidden) return;
     if (active || launchPending) stop("Paused when you left the tab");
     else stopSound();
-    held.clear(); resetAttempt(); syncHeld();
+    stopLiveVoices();
+    held.clear(); clearSustain(); resetAttempt(); syncHeld();
   });
 })();

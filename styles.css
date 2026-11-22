@@ -451,6 +451,8 @@ body::before{
 
 .key.white{
   width: var(--white-w);
+  flex: 0 0 var(--white-w);
+  min-width: 0;
   height: 100%;
   background: linear-gradient(180deg, #ffffff, #e8e8e8 50%, #d4d4d4);
   color: #111;
@@ -465,10 +467,13 @@ body::before{
 .key.black{
   position: absolute;
   top: 8px;
+  /* Never animate through transparency over the white-key row. */
+  transition: box-shadow 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
   height: var(--black-h);
   width: var(--black-w);
   border-radius: var(--black-radius);
-  background: linear-gradient(180deg, #3a3a3a, #1a1a1a 50%, #080808);
+  background: #080808 linear-gradient(180deg, #3a3a3a, #1a1a1a 50%, #080808);
   color: #eaeaea;
   box-shadow: 
     0 12px 24px rgba(0,0,0,0.70),
@@ -490,7 +495,7 @@ body::before{
 }
 
 .key:is(.selected, .kt-pick).black{
-  background: linear-gradient(180deg, #1f6b3b, #0b2d17);
+  background: #0b2d17 linear-gradient(180deg, #1f6b3b, #0b2d17);
   box-shadow: 0 0 0 3px rgba(29,185,84,0.45), 0 10px 20px rgba(0,0,0,0.55);
 }
 
