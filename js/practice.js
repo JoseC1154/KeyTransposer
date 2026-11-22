@@ -19,7 +19,7 @@
     const target = plan.targets.reduce((nearest, t) => Math.abs(first - t.time) < Math.abs(first - nearest.time) ? t : nearest);
     const delta = first - target.time;
     if (target.result || Math.abs(delta) > plan.window) return null;
-    const result = !same(uniqueNotes(notes), expected) || last - first > NOTE_SPREAD ? "wrong"
+    const result = !same(uniqueNotes(notes), target.notes || expected) || last - first > NOTE_SPREAD ? "wrong"
       : delta < -plan.tolerance ? "early" : delta > plan.tolerance ? "late" : "on";
     return { target, delta, result };
   }
@@ -40,25 +40,33 @@
   const practice = $("Practice"), dialog = $("MidiDialog");
   const beats = [...practice.querySelectorAll(".kt-beats span")];
   const api = window.KTTransposer;
-  const names = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
-  const defaultChords = [
-    { name: "C major", notes: [60, 64, 67] },
-    { name: "G major", notes: [55, 59, 62] },
-    { name: "A minor", notes: [57, 60, 64] },
-    { name: "F major", notes: [53, 57, 60] },
-  ];
   const statusText = { on: "On time", early: "Early", late: "Late", wrong: "Wrong chord", miss: "Missed" };
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
   let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
   let access = null, port = null, desired = "", failedPort = null, midiEpoch = 0, portEpoch = 0;
-  let chordOptions = [], picked = new Set(), keys = new Map(), glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
+  let sequence = [], picked = new Set(), scrollBefore = 0, displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
   const open = () => !practice.hidden;
-  const chord = () => chordOptions[Number($("Chord").value)] || defaultChords[0];
   const hitMode = () => $("Target").value;
   const heldNotes = () => [...new Set(held.values())];
   const midiHeld = n => heldNotes().includes(n);
-  window.KTPractice = { isHeld: midiHeld };
+  window.KTPractice = {
+    isHeld: midiHeld,
+    isOpen: open,
+    pick(n) {
+      if (!open()) return false;
+      if (sequence.length && !active?.demo) {
+        if (picked.has(n)) picked.delete(n); else picked.add(n);
+        paintKeys();
+      }
+      return true;
+    },
+    paintKey(key, n) {
+      key.classList.toggle("kt-pick", open() && picked.has(n));
+      key.classList.toggle("kt-example", open() && demoNotes.includes(n));
+      key.classList.toggle("kt-player", open() && performance.now() < touchUntil && touchNotes.includes(n));
+    },
+  };
 
   function feedback(message, kind = "") {
     if (lastFeedback === message && $("Feedback").dataset.kind === kind) return;
@@ -67,57 +75,31 @@
     $("Feedback").dataset.kind = kind;
   }
   function announceMidi(message) { $("MidiStatus").textContent = message; }
-  function paintKeys(now = performance.now()) {
-    const live = new Set([...heldNotes(), ...(now < touchUntil ? touchNotes : [])]);
-    const sample = new Set(demoNotes);
-    for (const [n, key] of keys) {
-      key.classList.toggle("pick", picked.has(n));
-      key.classList.toggle("example", sample.has(n));
-      key.classList.toggle("player", live.has(n));
-      const pressed = String(picked.has(n));
-      if (key.getAttribute("aria-pressed") !== pressed) key.setAttribute("aria-pressed", pressed);
-    }
-    $("Play").disabled = !picked.size || active?.demo === true;
+  function paintKeys() {
+    api.refresh();
+    $("Play").disabled = !picked.size || !sequence.length || active?.demo === true;
   }
   function syncHeld() {
-    if (open()) paintKeys();
-    else api.refresh();
+    paintKeys();
     $("Capture").disabled = !heldNotes().some(n => n >= 21 && n <= 108);
   }
 
-  function drawKeyboard() {
-    const notes = chord().notes;
-    const center = Math.round((notes[0] + notes.at(-1)) / 2);
-    const white = n => ![1, 3, 6, 8, 10].includes(n % 12);
-    let lo = Math.max(21, Math.min(center - 8, notes[0] - 1)), hi = Math.min(108, Math.max(center + 8, notes.at(-1) + 1));
-    if (!white(lo)) lo--;
-    if (!white(hi)) hi++;
-    const piano = $("Keyboard");
-    const numWhite = Array.from({length: hi-lo+1}, (_, i) => lo+i).filter(white).length;
-    piano.style.setProperty("--kt-min", Math.max(280, 21 * numWhite) + "px");
-    piano.replaceChildren();
-    keys.clear();
-    let left = 0;
-    for (let n = lo; n <= hi; n++) {
-      const key = document.createElement("button");
-      const w = white(n), name = names[n % 12] + (Math.floor(n / 12) - 1);
-      key.type = "button";
-      key.classList.toggle("black", !w);
-      key.style.left = 100 * (w ? left : left - .30) / numWhite + "%";
-      key.style.width = 100 * (w ? 1 : .60) / numWhite + "%";
-      key.setAttribute("aria-label", name);
-      if (w) key.textContent = n % 12 === 0 ? name : names[n % 12];
-      key.addEventListener("click", () => {
-        if (active?.demo) return;
-        if (picked.has(n)) picked.delete(n); else picked.add(n);
-        paintKeys();
-      });
-      keys.set(n, key);
-      piano.append(key);
-      if (w) left++;
+  function displaySlot(index) {
+    if (index === displayed) return;
+    displayed = index;
+    const current = sequence[index], next = sequence[index + 1];
+    $("Chord").textContent = current ? "Slot " + current.slot + (current.name ? " · " + current.name : "") : "No saved chords";
+    $("Next").textContent = next ? "Next: Slot " + next.slot + (next.name ? " · " + next.name : "") : current ? (index + 1) + " of " + sequence.length : "";
+    if (!current) return;
+    const scroll = document.getElementById("pianoScroll");
+    const keys = current.notes.map(n => scroll.querySelector('[data-midi="' + n + '"]')).filter(Boolean);
+    if (!keys.length || !scroll.clientWidth) return;
+    const viewport = scroll.getBoundingClientRect();
+    const left = Math.min(...keys.map(k => k.getBoundingClientRect().left));
+    const right = Math.max(...keys.map(k => k.getBoundingClientRect().right));
+    if (left < viewport.left || right > viewport.right) {
+      scroll.scrollLeft += (left + right - viewport.left - viewport.right) / 2;
     }
-    piano.parentElement.scrollLeft = Math.max(0, (piano.scrollWidth - piano.parentElement.clientWidth) * .5);
-    paintKeys();
   }
   function renderBeats(target, pulse = -1, demo = false, played = -1) {
     const state = [target, pulse, demo, played].join();
@@ -132,11 +114,11 @@
     });
   }
   function renderResults(plan) {
-    $("Results").replaceChildren(...(plan?.targets || []).map((t, i) => {
+    $("Results").replaceChildren(...(plan?.targets || []).map(t => {
       const el = document.createElement("span");
       el.className = t.result || "";
-      el.textContent = ({on:"✓",early:"‹",late:"›",wrong:"×",miss:"·"})[t.result] || i + 1;
-      el.setAttribute("aria-label", "Bar " + (i + 1) + ": " + (statusText[t.result] || "pending"));
+      el.textContent = ({on:"✓",early:"‹",late:"›",wrong:"×",miss:"·"})[t.result] || t.slot;
+      el.setAttribute("aria-label", "Slot " + t.slot + ": " + (statusText[t.result] || "pending"));
       return el;
     }));
   }
@@ -163,7 +145,8 @@
     resetAttempt();
     demoNotes = []; touchNotes = []; touchUntil = 0;
     glowBeat = -1; glowUntil = 0;
-    for (const id of ["Chord", "Tempo", "Target", "Demo", "Start"]) $(id).disabled = false;
+    for (const id of ["Tempo", "Target"]) $(id).disabled = false;
+    $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
     refreshIdle();
     paintKeys();
@@ -171,29 +154,26 @@
   }
   function closePractice() {
     stop();
-    practice.hidden = true;
+    practice.hidden = $("KeyboardActions").hidden = true;
     document.body.classList.remove("kt-practicing");
+    document.getElementById("pianoScroll").scrollLeft = scrollBefore;
     syncHeld();
     $("Open").focus();
   }
   function openPractice() {
-    const s = api.selection();
-    const presets = [
-      { ...s, name: s.name || "Selected voicing" },
-      ...api.chords().filter(Boolean).map(c => ({ ...c, name: "Slot " + c.slot + ": " + (c.name || "Saved chord") })),
-      ...defaultChords,
-    ].map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length >= 2);
-    chordOptions = presets;
-    $("Chord").replaceChildren(...presets.map((c, i) => new Option(c.name, String(i))));
-    $("Chord").value = "0";
-    practice.hidden = false;
+    sequence = api.chords().filter(Boolean).map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
+    scrollBefore = document.getElementById("pianoScroll").scrollLeft;
+    practice.hidden = $("KeyboardActions").hidden = false;
     document.body.classList.add("kt-practicing");
     picked.clear();
-    drawKeyboard();
+    displayed = -1;
+    displaySlot(0);
+    paintKeys();
     renderResults();
     refreshIdle();
-    feedback("Choose Example or Start");
-    $("Start").focus();
+    $("Demo").disabled = $("Start").disabled = !sequence.length;
+    feedback(sequence.length ? "Choose Example or Start" : "Save a chord in a memory slot first.");
+    $(sequence.length ? "Start" : "Back").focus();
   }
   async function unlockAudio() {
     const Audio = window.AudioContext || window.webkitAudioContext;
@@ -228,7 +208,7 @@
   }
   function submit(notes, first, last) {
     if (!active || active.demo) return;
-    const scored = score(active.plan, notes, active.notes, first, last);
+    const scored = score(active.plan, notes, [], first, last);
     if (scored) result(scored);
     else if (first >= active.plan.start + 3.5 * active.plan.step && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
       feedback("Aim for the outlined beat");
@@ -272,20 +252,25 @@
   }
   function tick() {
     if (!active) return;
-    const { plan, demo, notes } = active;
+    const { plan, demo } = active;
     const now = performance.now();
     const index = Math.floor((now - plan.start) / plan.step);
     const bar = Math.floor(index / 4) - 1;
-    const state = plan.targets[clamp(bar, 0, plan.targets.length - 1)];
+    const position = clamp(bar, 0, plan.targets.length - 1);
+    const state = plan.targets[position];
+    displaySlot(position);
     const pulse = index >= 0 && index < (plan.targets.length + 1) * 4 ? index % 4 : -1;
     if (index >= 4 && !active.go) {
       active.go = true;
       if (demo || lastFeedback.startsWith("Count")) feedback(demo ? "Example playing" : "Your turn");
     }
     const showingDemo = demo && bar >= 0 && bar < plan.targets.length && now >= state.time && now < state.time + Math.min(460, plan.step * .72);
-    demoNotes = showingDemo ? notes : [];
+    const highlighted = showingDemo ? state.notes : [];
+    if (demoNotes !== highlighted && (demoNotes.length || highlighted.length)) {
+      demoNotes = highlighted;
+      paintKeys();
+    }
     renderBeats(state.beat - 1, pulse, showingDemo, now < glowUntil ? glowBeat : -1);
-    paintKeys(now);
     if (!demo) {
       for (const t of plan.targets) {
         if (!t.result && now > t.time + plan.window + NOTE_SPREAD + 18) {
@@ -303,7 +288,7 @@
     frame = requestAnimationFrame(tick);
   }
   async function launch(demo) {
-    if (active || launchPending) return;
+    if (active || launchPending || !sequence.length) return;
     const token = ++runId;
     launchPending = true;
     $("Demo").disabled = $("Start").disabled = true;
@@ -313,21 +298,21 @@
       if (token !== runId || !open()) return;
       const bpm = clamp(Math.round(Number($("Tempo").value) || 72), 40, 160);
       $("Tempo").value = bpm;
-      for (const id of ["Chord", "Tempo", "Target"]) $(id).disabled = true;
+      for (const id of ["Tempo", "Target"]) $(id).disabled = true;
       resetAttempt();
       stopSound();
       const audioStart = audio.currentTime + .14;
       const out = audio.getOutputTimestamp?.();
       const offset = out?.performanceTime > 0 ? out.performanceTime + (audioStart - out.contextTime) * 1000 - performance.now() : 140;
       const start = performance.now() + (offset > 0 && offset < 500 ? offset : 140);
-      const plan = makePlan(start, bpm, hitMode(), demo ? (hitMode() === "rotate" ? 4 : 2) : 8);
-      const notes = [...chord().notes];
-      active = { demo, plan, notes, go: false };
+      const plan = makePlan(start, bpm, hitMode(), sequence.length);
+      plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
+      active = { demo, plan, go: false };
       renderResults(demo ? null : plan);
       for (let i = 0; i < (plan.targets.length + 1) * 4; i++) {
         tone(i % 4 === 0 ? 1400 : 900, audioStart + i * plan.step / 1000, .045, i % 4 === 0 ? .14 : .09);
       }
-      if (demo) for (const t of plan.targets) soundChord(notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
+      if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
       feedback("Count in · 1 bar");
       tick();
     } catch {
@@ -424,7 +409,6 @@
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));
   $("Stop").addEventListener("click", () => stop("Stopped"));
-  $("Chord").addEventListener("change", () => { picked.clear(); drawKeyboard(); renderResults(); feedback("Choose Example or Start"); });
   $("Target").addEventListener("change", () => { refreshIdle(); renderResults(); });
   $("Play").addEventListener("click", async event => {
     const notes = uniqueNotes([...picked]);

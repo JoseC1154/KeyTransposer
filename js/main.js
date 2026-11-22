@@ -1071,6 +1071,7 @@ function updateHint() {
 }
 
 function handleKeyToggle(midi) {
+  if (window.KTPractice?.pick(midi)) return;
   // Manual selection breaks the association with a loaded slot
   activeSlot = -1;
   activeBankPc = -1;
@@ -1273,8 +1274,9 @@ function updateSelectionUI() {
   const keys = elPiano.querySelectorAll(".key");
   for (const k of keys) {
     const midi = Number(k.dataset.midi);
-    k.classList.toggle("selected", selectedMidis.has(midi));
+    k.classList.toggle("selected", selectedMidis.has(midi) && !window.KTPractice?.isOpen());
     k.classList.toggle("kt-midi-held", window.KTPractice?.isHeld(midi) ?? false);
+    window.KTPractice?.paintKey(k, midi);
   }
 }
 

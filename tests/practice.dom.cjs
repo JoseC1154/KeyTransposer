@@ -7,7 +7,12 @@ const { join } = require('node:path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const base = join(__dirname, '..');
 const calm = () => new Promise(resolve => setImmediate(resolve));
-async function setup(t) {
+const slots = [
+  { slot: 1, name: 'C major', midis: [60,64,67] },
+  { slot: 4, name: 'G major', midis: [55,59,62] },
+  { slot: 11, name: 'F major', midis: [53,57,60] }
+];
+async function setup(t, entries = slots) {
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', e => errors.push(e));
@@ -15,6 +20,10 @@ async function setup(t) {
     runScripts:'outside-only', pretendToBeVisual:true, url:'https://practice.invalid/', virtualConsole,
   });
   const w = dom.window, d = w.document;
+  const bankChords = Array.from({length:12}, () => Array(12).fill(null));
+  for (const {slot, name, midis} of entries) bankChords[0][slot-1] = {name, midis};
+  bankChords[1][0] = {name:'Different bank', midis:[61,65,68]};
+  w.localStorage.setItem('pct_state_v1', JSON.stringify({currentScalePc:0, bankChords}));
   w.HTMLDialogElement.prototype.showModal = function(){ this.setAttribute('open',''); };
   w.HTMLDialogElement.prototype.close = function(){ this.removeAttribute('open'); };
   t.after(() => { w.close(); assert.deepEqual(errors, []); });
@@ -44,26 +53,32 @@ async function setup(t) {
   const id = id => d.getElementById('kt'+id);
   const set = (key,value) => {id(key).value = value; id(key).dispatchEvent(new w.Event('change'));};
   const click = key => id(key).click();
+  const piano = d.getElementById('piano');
+  const tap = n => piano.querySelector('[data-midi="'+n+'"]').dispatchEvent(new w.Event('pointerup', {bubbles:true}));
   const at = time => { clock=time; const queued=[...frames.values()]; frames.clear(); queued.forEach(f=>f(time)); };
   const send = (status,note,velocity,time=clock) => port.onmidimessage({ data:[status,note,velocity], timeStamp:time });
   const midi = async () => { click('PracticeMidi'); click('Connect'); await calm(); id('MidiDialog').close(); };
   const round = async (beat='1') => { set('Tempo','120'); set('Target',beat); click('Start'); await calm(); };
-  return {w,d,usb,port,id,set,click,at,send,midi,round,played,asked:()=>asked,pending:p=>{pending=p;}};
+  return {w,d,piano,tap,usb,port,id,set,click,at,send,midi,round,played,asked:()=>asked,pending:p=>{pending=p;}};
 }
 test('Shows the demo in amber on beat 2; stopping clears scheduled sound and restores transposer', async t => {
   const x = await setup(t);
   assert.equal(x.asked(),0);
   x.click('Open'); x.set('Tempo','120'); x.set('Target','2'); x.click('Demo'); await calm();
   assert.match(x.id('Feedback').textContent,/Count in/);
-  assert.equal(x.played.length,18);
+  assert.equal(x.played.length,25);
   x.at(3140);
-  assert.equal(x.id('Keyboard').querySelectorAll('.example').length,0);
+  assert.equal(x.piano.querySelectorAll('.kt-example').length,0);
   x.at(3645);
   assert.equal(x.d.querySelector('.kt-beats .example').textContent,'2');
-  assert.equal(x.id('Keyboard').querySelectorAll('.example').length,3);
+  assert.equal(x.piano.querySelectorAll('.kt-example').length,3);
+  x.at(5645);
+  assert.deepEqual([...x.piano.querySelectorAll('.kt-example')].map(k=>Number(k.dataset.midi)).sort((a,b)=>a-b),slots[1].midis);
+  x.at(7645);
+  assert.deepEqual([...x.piano.querySelectorAll('.kt-example')].map(k=>Number(k.dataset.midi)).sort((a,b)=>a-b),slots[2].midis);
   x.click('Stop');
   assert.equal(x.played.every(o=>o.end===0),true);
-  assert.equal(x.id('Keyboard').querySelectorAll('.example').length,0);
+  assert.equal(x.piano.querySelectorAll('.kt-example').length,0);
   x.click('Back');
   assert.equal(x.id('Practice').hidden,true);
   assert.equal(x.d.body.classList.contains('kt-practicing'),false);
@@ -74,14 +89,14 @@ test('MIDI input scores a chord, distinguishes release, and never changes the tr
   assert.equal(x.asked(),1);
   x.at(3140);
   x.send(0x90,60,90,3140); x.send(0x90,64,90,3150); x.send(0x90,67,90,3160);
-  assert.equal(x.id('Keyboard').querySelectorAll('.player').length,3);
+  assert.equal(x.piano.querySelectorAll('.kt-midi-held').length,3);
   x.send(0x90,60,0); x.send(0x80,64,0); x.send(0x80,67,0);
   assert.equal(x.id('Feedback').textContent,'On time');
   x.at(3180);
   assert.equal(x.d.querySelector('.kt-beats .played').textContent,'1');
-  assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Bar 1: On time');
+  assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: On time');
   x.at(5700);
-  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Bar 2: Missed');
+  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: Missed');
   x.click('Back');
   assert.equal(x.w.KTTransposer.selection().notes.length,0);
 });
@@ -93,7 +108,7 @@ test('Unplugging before release stops practice and clears held notes', async t =
   x.port.state='disconnected'; x.usb.onstatechange();
   assert.match(x.id('Feedback').textContent,/MIDI input changed/);
   assert.equal(x.id('Stop').hidden,true);
-  assert.equal(x.id('Keyboard').querySelectorAll('.player').length,0);
+  assert.equal(x.piano.querySelectorAll('.kt-midi-held').length,0);
 });
 test('Canceling a permission request ignores its late resolution', async t => {
   const x=await setup(t);
@@ -106,8 +121,49 @@ test('Canceling a permission request ignores its late resolution', async t => {
 test('On-screen play from selected keys scores without a controller', async t => {
   const x=await setup(t);
   x.click('Open'); await x.round('4');
-  for(const name of ['C4','E4','G4']) x.id('Keyboard').querySelector('[aria-label="'+name+'"]').click();
+  for(const note of [60,64,67]) x.tap(note);
   x.at(4640); x.click('Play'); await calm();
   assert.equal(x.id('Feedback').textContent,'On time');
   assert.equal(x.asked(),0);
+});
+
+test('One existing keyboard is reused and practice leaves the transposer selection and chord bank intact', async t => {
+  const x=await setup(t);
+  x.tap(70);
+  const saved = x.w.localStorage.getItem('pct_state_v1');
+  const original = x.piano.querySelector('[data-midi="60"]');
+  x.click('Open'); x.tap(60);
+  assert.equal(x.d.querySelectorAll('[aria-label="Piano keyboard"]').length,1);
+  assert.equal(x.piano.querySelector('[data-midi="60"]'),original);
+  assert.equal(original.classList.contains('kt-pick'),true);
+  assert.deepEqual([...x.w.KTTransposer.selection().notes],[70]);
+  x.click('Back');
+  assert.equal(original.classList.contains('kt-pick'),false);
+  assert.equal(x.piano.querySelector('[data-midi="70"]').classList.contains('selected'),true);
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'), saved);
+});
+test('Sparse slots run in order, grade against their own chords, then finish after three', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  assert.deepEqual([...x.id('Results').children].map(e => e.textContent),['1','4','11']);
+  for (const [i, notes] of slots.map(x=>x.midis).entries()) {
+    const at = 3140 + i * 2000;
+    x.at(at);
+    assert.match(x.id('Chord').textContent,new RegExp('Slot '+slots[i].slot+' ·'));
+    for(const n of notes) x.send(0x90,n,90);
+    for(const n of notes) x.send(0x80,n,0);
+    assert.equal(x.id('Feedback').textContent,'On time');
+  }
+  x.at(9200);
+  assert.equal(x.id('Feedback').textContent,'3 of 3 on time');
+  assert.equal(x.id('Stop').hidden,true);
+});
+test('Empty current bank shows no demo or start rather than defaults or another bank', async t => {
+  const x=await setup(t,[]);
+  x.click('Open');
+  assert.equal(x.id('Start').disabled,true);
+  assert.equal(x.id('Demo').disabled,true);
+  assert.equal(x.id('Chord').textContent,'No saved chords');
+  x.click('Start');
+  assert.equal(x.played.length,0);
 });
