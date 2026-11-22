@@ -14,7 +14,7 @@
 }
 #ktPractice {
   grid-column: 1 / -1; display: grid; min-width: 0; gap: 7px;
-  border-top: 1px solid rgba(255,255,255,.12); padding-top: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.12); padding-bottom: 8px;
 }
 #commandDeck #ktPractice .ctrl {
   aspect-ratio: auto; height: 38px; min-width: 0; font: 700 .85rem system-ui; border-radius: 12px; padding-inline: 8px;
@@ -25,12 +25,12 @@
 
 .kt-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kt-dialog-head h2 { margin: 0; font-size: 1.2rem; }
-.kt-setup { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; }
+.kt-setup { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 10px; }
 .kt-setup label, .kt-midi-controls label { display: grid; gap: 4px; min-width: 0; font-size: .78rem; color: var(--kt-muted); }
 #ktMidiDialog button { min-height: 42px; }
 #ktPort { min-height: 40px; max-width: 100%; color: var(--text); background: #202020; border-radius: 10px; }
 #commandDeck #ktTempo { width: 4.25rem; font-variant-numeric: tabular-nums; }
-.kt-beats { margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.kt-beats { margin: 0; display: grid; grid-template-columns: repeat(var(--kt-count, 4), minmax(0, 1fr)); gap: 7px; }
 .kt-beats span {
   min-height: 32px; display: grid; place-items: center;
   color: var(--kt-muted); font-size: 1.35rem; font-weight: 800;
@@ -61,6 +61,10 @@ body.kt-practicing #piano .key.kt-player .noteLabel { color: #16211d; }
 .kt-midi-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
 .key.kt-midi-held.white, .key.kt-midi-held.black { background: #54debc; color: #092019; }
 @media (max-width: 520px) {
+  .kt-setup { grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; gap: 6px; }
+  .kt-slot-label { grid-column: 1 / -1; }
+  #commandDeck #ktPractice .ctrl { padding-inline: 4px; }
+
   .kt-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .kt-actions button { padding-inline: 8px; }
   .kt-transport { grid-template-columns: repeat(2, minmax(0,1fr)); }

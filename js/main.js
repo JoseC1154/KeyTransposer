@@ -357,11 +357,18 @@ function customPrompt(message, defaultValue = "") {
       }
     };
 
+    const handleDismiss = (e) => {
+      if (e.target.closest('[data-close="promptModal"]')) handleCancel();
+    };
     const cleanup = () => {
+      elPromptModal?.removeEventListener("pointerdown", handleDismiss);
+      elPromptModal?.removeEventListener("click", handleDismiss);
       if (elPromptOk) elPromptOk.removeEventListener("click", handleOk);
       if (elPromptInput) elPromptInput.removeEventListener("keydown", handleKeydown);
     };
 
+    elPromptModal?.addEventListener("pointerdown", handleDismiss);
+    elPromptModal?.addEventListener("click", handleDismiss);
     if (elPromptOk) elPromptOk.addEventListener("click", handleOk);
     if (elPromptInput) elPromptInput.addEventListener("keydown", handleKeydown);
   });
@@ -804,6 +811,27 @@ function renderMemoryButtons() {
 }
 
 
+let savingPracticeChord = false;
+async function savePracticeSlot(i, notes) {
+  if (savingPracticeChord) return;
+  const bank = currentScalePc;
+  const { min, max } = rangeMidis();
+  const midis = [...new Set(notes.map(m => wrapIntoRange(m, min, max)))].sort((a, b) => a - b);
+  if (!midis.length) return;
+  const autoName = detectChordNameFromMidis(midis);
+  savingPracticeChord = true;
+  try {
+    const name = await customPrompt("Name this chord (auto-filled, edit if you want):", autoName || "");
+    if (name === null || getSlot(bank, i)) return;
+    bankChords[bank][i] = { midis, name: name.trim() || autoName || "" };
+    saveState();
+    renderMemoryButtons();
+    syncMemoryModalGrid();
+  } finally {
+    savingPracticeChord = false;
+  }
+}
+
 function syncMemoryModalGrid() {
   if (!elMemoryGridModal) return;
 
@@ -919,12 +947,20 @@ function transposeBanksAndChords(deltaSemitone) {
 if (elMemoryGrid) {
   elMemoryGrid.querySelectorAll(".memBtn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (savingPracticeChord) return;
       const i = Number(btn.dataset.slot);
+      const practicing = window.KTPractice?.isOpen();
+      const practiceNotes = practicing ? window.KTPractice.notesForSlot() || [...selectedMidis] : null;
+      if (practicing) window.KTPractice.beforeSlot();
       activeSlot = i;
       activeBankPc = currentScalePc;
 
       const slot = getSlot(currentScalePc, i);
       if (!slot) {
+        if (practiceNotes?.length) {
+          void savePracticeSlot(i, practiceNotes);
+          return;
+        }
         syncMemoryModalGrid();
         openModal(elMemoryModal);
         if (elSlotHint) {
@@ -936,6 +972,7 @@ if (elMemoryGrid) {
       }
 
       loadSlot(i);
+      if (practicing) window.KTPractice.slotLoaded(slot.midis);
       renderMemoryButtons();
     });
   });

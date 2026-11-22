@@ -59,6 +59,34 @@
       <div id="commandDeck" class="deckControls calculatorDeck">
         
 
+        <section id="ktPractice" hidden aria-label="Practice controls">
+          <div class="kt-setup">
+            <div class="kt-slot-label"><strong id="ktChord">No saved chords</strong><small id="ktNext"></small></div>
+            <label>Meter <select id="ktMeter" class="ctrl mini">
+              <option value="2/4">2/4</option><option value="3/4">3/4</option>
+              <option value="4/4" selected>4/4</option><option value="5/4">5/4</option>
+              <option value="6/8">6/8</option><option value="7/8">7/8</option>
+            </select></label>
+            <label>Hit on <select id="ktTarget" class="ctrl mini">
+              <option value="1">Beat 1</option><option value="2">Beat 2</option>
+              <option value="3">Beat 3</option><option value="4">Beat 4</option>
+              <option value="rotate">Rotate 1–4</option>
+            </select></label>
+            <label><span id="ktTempoLabel">BPM</span> <input id="ktTempo" class="ctrl mini" type="number" value="72" min="40" max="160" step="1" inputmode="numeric" /></label>
+          </div>
+          <div class="kt-beats" role="group" aria-label="4 beats per bar">
+            <span>1</span><span>2</span><span>3</span><span>4</span>
+          </div>
+          <div class="kt-transport">
+            <button class="ctrl mini" id="ktDemo" type="button">Example</button>
+            <button class="ctrl mini accent" id="ktStart" type="button">Start</button>
+            <button class="ctrl mini" id="ktStop" type="button" hidden>Stop</button>
+            <button class="ctrl mini" id="ktPlay" type="button" disabled>Play selected</button>
+          </div>
+          <div class="kt-feedback" id="ktFeedback" role="status"></div>
+          <div class="kt-results" id="ktResults" aria-label="Results by slot"></div>
+        </section>
+
         <div class="bankSelector" id="bankSelector">
           <button class="bankBtn" id="btnBankPrev" type="button" aria-label="Previous scale">◀</button>
           <button class="bankBtn bankCurrent" id="btnBankCurrent" type="button" aria-label="Current scale">C</button>
@@ -77,28 +105,6 @@
           <button class="ctrl mini" id="btnAlternates" type="button" aria-label="Alternate chords">≈</button>
           <button class="ctrl mini" id="btnUndo" type="button" aria-label="Undo alternate chord" hidden>↶</button>
         </div>
-        <section id="ktPractice" hidden aria-label="Practice controls">
-          <div class="kt-setup">
-            <div class="kt-slot-label"><strong id="ktChord">No saved chords</strong><small id="ktNext"></small></div>
-            <label>Hit on <select id="ktTarget" class="ctrl mini">
-              <option value="1">Beat 1</option><option value="2">Beat 2</option>
-              <option value="3">Beat 3</option><option value="4">Beat 4</option>
-              <option value="rotate">Rotate 1–4</option>
-            </select></label>
-            <label>BPM <input id="ktTempo" class="ctrl mini" type="number" value="72" min="40" max="160" step="1" inputmode="numeric" /></label>
-          </div>
-          <div class="kt-beats" role="group" aria-label="Four beats per bar">
-            <span>1</span><span>2</span><span>3</span><span>4</span>
-          </div>
-          <div class="kt-transport">
-            <button class="ctrl mini" id="ktDemo" type="button">Example</button>
-            <button class="ctrl mini accent" id="ktStart" type="button">Start</button>
-            <button class="ctrl mini" id="ktStop" type="button" hidden>Stop</button>
-            <button class="ctrl mini" id="ktPlay" type="button" disabled>Play selected</button>
-          </div>
-          <div class="kt-feedback" id="ktFeedback" role="status"></div>
-          <div class="kt-results" id="ktResults" aria-label="Results by slot"></div>
-        </section>
       </div>
 
       <div class="memoryStrip" id="memoryGrid" role="group" aria-label="12 chord memory slots">

@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v7-inline-practice";
+const CACHE_NAME = "piano-transposer-v8-meters-memory";
 const ASSETS = [
   "./",
   "./index.html",

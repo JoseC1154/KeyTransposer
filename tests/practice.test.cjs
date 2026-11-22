@@ -52,3 +52,20 @@ test('MIDI decodes channels, note-off and zero velocity; ignores CC', () => {
 test('Only valid piano notes retained and normalized', () => {
   assert.deepEqual(uniqueNotes([108,60,60,0,109,64.5,21]),[21,60,108]);
 });
+test('3/4 count-in and targets use three quarter notes per bar', () => {
+  const p = makePlan(0, 120, '3', 2, '3/4');
+  assert.equal(p.count, 3);
+  assert.deepEqual(p.targets.map(t=>t.time), [2500,4000]);
+});
+test('6/8 uses six eighth-note counts at a dotted-quarter BPM and accents 1 and 4', () => {
+  const p = makePlan(0, 60, '4', 2, '6/8');
+  assert.equal(p.count, 6);
+  assert.equal(p.step, 1000/3);
+  assert.deepEqual(p.accents, [3]);
+  assert.deepEqual(p.targets.map(t=>Math.round(t.time)), [3000,5000]);
+});
+test('Rotate respects the selected meter and fixed targets clamp to a smaller bar', () => {
+  const p = makePlan(0, 120, 'rotate', 5, '3/4');
+  assert.deepEqual(p.targets.map(t=>t.beat), [1,2,3,1,2]);
+  assert.equal(makePlan(0, 120, '7', 1, '2/4').targets[0].beat,2);
+});

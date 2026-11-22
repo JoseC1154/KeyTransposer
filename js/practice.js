@@ -4,15 +4,25 @@
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
   const uniqueNotes = notes => [...new Set(notes.filter(n => Number.isInteger(n) && n >= 21 && n <= 108))].sort((a, b) => a - b);
   const same = (a, b) => a.length === b.length && a.every((n, i) => n === b[i]);
-  function makePlan(start, bpm, beat, bars = 8) {
-    const step = 60000 / bpm;
+  const METERS = {
+    "2/4": { count: 2, split: 1, accents: [] },
+    "3/4": { count: 3, split: 1, accents: [] },
+    "4/4": { count: 4, split: 1, accents: [] },
+    "5/4": { count: 5, split: 1, accents: [3] },
+    "6/8": { count: 6, split: 3, accents: [3] },
+    "7/8": { count: 7, split: 1, accents: [2, 4] },
+  };
+  const meterFor = name => Object.hasOwn(METERS, name) ? METERS[name] : METERS["4/4"];
+  function makePlan(start, bpm, beat, bars = 8, meter = "4/4") {
+    const { count, split, accents } = meterFor(meter);
+    const step = 60000 / bpm / split;
     const tolerance = clamp(step * .11, 55, 100);
     const window = Math.min(step * .45, tolerance * 2.4);
     const targets = Array.from({ length: bars }, (_, i) => {
-      const hit = beat === "rotate" ? i % 4 + 1 : Number(beat);
-      return { time: start + ((i + 1) * 4 + hit - 1) * step, beat: hit, result: null };
+      const hit = beat === "rotate" ? i % count + 1 : clamp(Number(beat) || 1, 1, count);
+      return { time: start + ((i + 1) * count + hit - 1) * step, beat: hit, result: null };
     });
-    return { start, step, tolerance, window, targets, end: Math.max(start + (bars + 1) * 4 * step, targets.at(-1).time + window + NOTE_SPREAD + 30) };
+    return { start, step, count, accents, tolerance, window, targets, end: Math.max(start + (bars + 1) * count * step, targets.at(-1).time + window + NOTE_SPREAD + 30) };
   }
   function score(plan, notes, expected, first, last = first) {
     // Closest target overall, not closest remaining target: extra presses cannot fill a different bar.
@@ -38,7 +48,8 @@
 
   const $ = id => document.getElementById("kt" + id);
   const practice = $("Practice"), dialog = $("MidiDialog");
-  const beats = [...practice.querySelectorAll(".kt-beats span")];
+  const beatStrip = practice.querySelector(".kt-beats");
+  let beats = [...beatStrip.children];
   const api = window.KTTransposer;
   const statusText = { on: "On time", early: "Early", late: "Late", wrong: "Wrong chord", miss: "Missed" };
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
@@ -54,9 +65,22 @@
   window.KTPractice = {
     isHeld: midiHeld,
     isOpen: open,
+    notesForSlot() {
+      if (!open()) return null;
+      const heldPiano = uniqueNotes(heldNotes());
+      return heldPiano.length ? heldPiano : picked.size ? uniqueNotes([...picked]) : null;
+    },
+    beforeSlot() {
+      if (active || launchPending) stop("Stopped for chord memory");
+    },
+    slotLoaded(notes) {
+      if (!open()) return;
+      picked = new Set(uniqueNotes(notes));
+      paintKeys();
+    },
     pick(n) {
       if (!open()) return false;
-      if (sequence.length && !active?.demo) {
+      if (!active?.demo) {
         if (picked.has(n)) picked.delete(n); else picked.add(n);
         paintKeys();
       }
@@ -82,7 +106,7 @@
   }
   function syncHeld() {
     paintKeys();
-    $("Capture").disabled = launchPending || !!active || !heldNotes().some(n => n >= 21 && n <= 108);
+    $("Capture").disabled = !heldNotes().some(n => n >= 21 && n <= 108);
   }
 
   function displaySlot(index) {
@@ -101,7 +125,7 @@
       el.classList.toggle("pulse", i === pulse);
       el.classList.toggle("example", demo && i === target);
       el.classList.toggle("played", i === played);
-      el.setAttribute("aria-label", "Beat " + (i + 1) + (i === target ? ", target" : ""));
+      el.setAttribute("aria-label", ($("Meter").value.endsWith("/8") ? "Count " : "Beat ") + (i + 1) + (i === target ? ", target" : ""));
     });
   }
   function renderResults(plan) {
@@ -112,6 +136,26 @@
       el.setAttribute("aria-label", "Slot " + t.slot + ": " + (statusText[t.result] || "pending"));
       return el;
     }));
+  }
+  function refreshMeter() {
+    const value = $("Meter").value;
+    const { count, split } = meterFor(value);
+    const eighths = value.endsWith("/8");
+    const mode = hitMode();
+    const label = eighths ? "Count" : "Beat";
+    $("Target").replaceChildren(...Array.from({length:count}, (_, i) => new Option(label + " " + (i + 1), String(i + 1))), new Option("Rotate 1–" + count, "rotate"));
+    $("Target").value = mode === "rotate" ? mode : String(Math.min(Number(mode) || 1, count));
+    $("TempoLabel").textContent = split === 3 ? "BPM (♩.)" : eighths ? "BPM (♪)" : "BPM";
+    beats = Array.from({length:count}, (_, i) => {
+      const el = document.createElement("span");
+      el.textContent = i + 1;
+      return el;
+    });
+    beatStrip.style.setProperty("--kt-count", count);
+    beatStrip.setAttribute("aria-label", count + (eighths ? " counts per bar" : " beats per bar"));
+    beatStrip.replaceChildren(...beats);
+    lastVisual = "";
+    refreshIdle();
   }
   function refreshIdle() {
     renderBeats(hitMode() === "rotate" ? 0 : Number(hitMode()) - 1);
@@ -128,7 +172,7 @@
     audioNodes.clear();
   }
   function lockExistingControls() {
-    for (const button of document.querySelectorAll("#btnClear, #btnMenu, #ktCapture, #commandDeck > div button, #memoryGrid button")) {
+    for (const button of document.querySelectorAll("#btnClear, #btnMenu, #commandDeck > div button")) {
       if (!button.disabled) {
         button.disabled = true;
         lockedControls.add(button);
@@ -146,7 +190,7 @@
     resetAttempt();
     demoNotes = []; touchNotes = []; touchUntil = 0;
     glowBeat = -1; glowUntil = 0;
-    for (const id of ["Tempo", "Target"]) $(id).disabled = false;
+    for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = false;
     $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
     refreshIdle();
@@ -218,7 +262,7 @@
     if (!active || active.demo) return;
     const scored = score(active.plan, notes, [], first, last);
     if (scored) result(scored);
-    else if (first >= active.plan.start + 3.5 * active.plan.step && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
+    else if (first >= active.plan.start + (active.plan.count - .5) * active.plan.step && !active.plan.targets.some(t => t.result && Math.abs(first - t.time) < active.plan.step * .5)) {
       feedback("Aim for the outlined beat");
     }
   }
@@ -263,12 +307,12 @@
     const { plan, demo } = active;
     const now = performance.now();
     const index = Math.floor((now - plan.start) / plan.step);
-    const bar = Math.floor(index / 4) - 1;
+    const bar = Math.floor(index / plan.count) - 1;
     const position = clamp(bar, 0, plan.targets.length - 1);
     const state = plan.targets[position];
     displaySlot(position);
-    const pulse = index >= 0 && index < (plan.targets.length + 1) * 4 ? index % 4 : -1;
-    if (index >= 4 && !active.go) {
+    const pulse = index >= 0 && index < (plan.targets.length + 1) * plan.count ? index % plan.count : -1;
+    if (index >= plan.count && !active.go) {
       active.go = true;
       if (demo || lastFeedback.startsWith("Count")) feedback(demo ? "Example playing" : "Your turn");
     }
@@ -308,19 +352,20 @@
       if (token !== runId || !open()) return;
       const bpm = clamp(Math.round(Number($("Tempo").value) || 72), 40, 160);
       $("Tempo").value = bpm;
-      for (const id of ["Tempo", "Target"]) $(id).disabled = true;
+      for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = true;
       resetAttempt();
       stopSound();
       const audioStart = audio.currentTime + .14;
       const out = audio.getOutputTimestamp?.();
       const offset = out?.performanceTime > 0 ? out.performanceTime + (audioStart - out.contextTime) * 1000 - performance.now() : 140;
       const start = performance.now() + (offset > 0 && offset < 500 ? offset : 140);
-      const plan = makePlan(start, bpm, hitMode(), sequence.length);
+      const plan = makePlan(start, bpm, hitMode(), sequence.length, $("Meter").value);
       plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
       active = { demo, plan, go: false };
       renderResults(demo ? null : plan);
-      for (let i = 0; i < (plan.targets.length + 1) * 4; i++) {
-        tone(i % 4 === 0 ? 1400 : 900, audioStart + i * plan.step / 1000, .045, i % 4 === 0 ? .14 : .09);
+      for (let i = 0; i < (plan.targets.length + 1) * plan.count; i++) {
+        const position = i % plan.count, accent = plan.accents.includes(position);
+        tone(position === 0 ? 1400 : accent ? 1150 : 900, audioStart + i * plan.step / 1000, .045, position === 0 ? .14 : accent ? .11 : .08);
       }
       if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
       feedback("Count in · 1 bar");
@@ -414,10 +459,16 @@
   $("Connect").addEventListener("click", connect);
   $("Disconnect").addEventListener("click", disconnect);
   $("Port").addEventListener("change", () => { desired = $("Port").value; failedPort = null; refreshPorts(); });
-  $("Capture").addEventListener("click", () => api.capture(heldNotes()));
+  $("Capture").addEventListener("click", () => {
+    const notes = uniqueNotes(heldNotes());
+    if (!notes.length) return;
+    if (open()) window.KTPractice.slotLoaded(notes);
+    else api.capture(notes);
+  });
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));
   $("Stop").addEventListener("click", () => stop("Stopped"));
+  $("Meter").addEventListener("change", () => { refreshMeter(); renderResults(); });
   $("Target").addEventListener("change", () => { refreshIdle(); renderResults(); });
   $("Play").addEventListener("click", async event => {
     const notes = uniqueNotes([...picked]);
@@ -432,6 +483,7 @@
       if (open() && token === runId) soundChord(notes, audio.currentTime + .005, .30);
     } catch {}
   });
+  refreshMeter();
   announceMidi("Not connected");
   window.addEventListener("pagehide", () => { stop(); disconnect(); });
   document.addEventListener("visibilitychange", () => {
