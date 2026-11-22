@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v14-clean-practice-highlights";
+const CACHE_NAME = "piano-transposer-v15-sustain-glow";
 const ASSETS = [
   "./",
   "./index.html",

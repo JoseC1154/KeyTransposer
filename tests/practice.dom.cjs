@@ -458,6 +458,11 @@ test('Sustain fades released keys without adding them to capture, and pedal-off 
   x.at(1300);
   x.w.dispatchEvent(new x.w.Event('resize'));
   assert.equal(key(61).style.getPropertyValue('--kt-sustain-delay'),'-300ms');
+  x.at(6500);
+  x.w.dispatchEvent(new x.w.Event('resize'));
+  assert.equal(key(61).classList.contains('kt-midi-sustain'),true);
+  assert.equal(key(61).style.getPropertyValue('--kt-sustain-delay'),'-2400ms');
+
   x.send(0x91,63,92); x.send(0x81,63,64);
   assert.equal(key(63).classList.contains('kt-midi-sustain'),false);
   x.send(0xb1,64,0);

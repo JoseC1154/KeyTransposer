@@ -85,8 +85,8 @@ body.kt-practicing #piano .key.kt-player .noteLabel { color: #16211d; }
 }
 @keyframes kt-sustain-fade {
   from { opacity: .85; }
-  to { opacity: 0; }
+  to { opacity: .32; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .key.kt-midi-sustain:not(.kt-example):not(.kt-player)::after { animation: none; opacity: .25; }
+  .key.kt-midi-sustain:not(.kt-example):not(.kt-player)::after { animation: none; opacity: .32; }
 }

@@ -56,7 +56,6 @@
   let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
   const pedalDown = new Set(), sustained = new Map();
   const sustainFadeMs = 2400;
-  let sustainTimer = 0;
   const liveVoices = new Map();
   const pianoSwitch = $("PianoSound");
   let pianoSound = false, soundRequest = 0;
@@ -121,19 +120,7 @@
     for (const id of liveVoices.keys()) releaseLiveVoice(id, .045);
     liveVoices.clear();
   }
-  function scheduleSustainCleanup() {
-    clearTimeout(sustainTimer);
-    if (!sustained.size) return;
-    const firstEnd = Math.min(...[...sustained.values()].map(entry => entry.time + sustainFadeMs));
-    sustainTimer = setTimeout(() => {
-      const now = performance.now();
-      for (const [id, entry] of sustained) if (now - entry.time >= sustainFadeMs) sustained.delete(id);
-      paintKeys();
-      scheduleSustainCleanup();
-    }, Math.max(1, Math.ceil(firstEnd - performance.now())));
-  }
   function clearSustain() {
-    clearTimeout(sustainTimer);
     pedalDown.clear();
     sustained.clear();
   }
@@ -148,7 +135,6 @@
         releaseLiveVoice(id, .10);
         sustained.delete(id);
       }
-      scheduleSustainCleanup();
       paintKeys();
     }
   }
@@ -209,9 +195,9 @@
         for (const tail of sustained.values()) if (tail.note === n) releasedAt = Math.max(releasedAt, tail.time);
       }
       const elapsed = performance.now() - releasedAt;
-      const showTail = roundMode !== "demo" && elapsed < sustainFadeMs;
+      const showTail = roundMode !== "demo" && Number.isFinite(releasedAt);
       if (showTail && key.dataset.ktRelease !== String(releasedAt)) {
-        key.style.setProperty("--kt-sustain-delay", `-${Math.max(0, elapsed)}ms`);
+        key.style.setProperty("--kt-sustain-delay", `-${clamp(elapsed, 0, sustainFadeMs)}ms`);
         key.dataset.ktRelease = String(releasedAt);
       }
       if (!showTail) delete key.dataset.ktRelease;
@@ -471,7 +457,6 @@
       const wasHeld = held.has(msg.key);
       if (wasHeld && pedalDown.has(channel)) {
         sustained.set(msg.key, { note: msg.note, channel, time: performance.now() });
-        scheduleSustainCleanup();
         releaseLiveVoice(msg.key, sustainFadeMs / 1000);
       } else if (wasHeld) releaseLiveVoice(msg.key, .13);
       held.delete(msg.key);
