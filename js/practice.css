@@ -2,10 +2,7 @@
 .kt-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
 .kt-actions button { white-space: nowrap; }
 #ktCapture:disabled { display: none; }
-body.kt-practicing .topbar, body.kt-practicing #commandDeck,
-body.kt-practicing #memoryGrid, body.kt-practicing #footer { display: none; }
-body.kt-practicing .wrap { padding-top: 10px !important; }
-body.kt-practicing .pianoContainer { position: static; }
+#ktOpen[aria-expanded="true"] { border-color: rgba(29,185,84,.55); background: rgba(29,185,84,.15); }
 .kt-slot-label { min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 #ktChord, #ktNext { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #ktNext { min-height: 1rem; color: var(--kt-muted); }
@@ -15,35 +12,37 @@ body.kt-practicing .pianoContainer { position: static; }
   --kt-demo: #ffb557; --kt-player: #54debc;
   color: var(--kt-ink);
 }
-#ktPractice { width: min(100%, 740px); margin: 0 auto; }
-.kt-practice-head, .kt-dialog-head, .kt-keyboard-actions {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+#ktPractice {
+  grid-column: 1 / -1; display: grid; min-width: 0; gap: 7px;
+  border-top: 1px solid rgba(255,255,255,.12); padding-top: 8px;
 }
-.kt-practice-head h1, .kt-dialog-head h2 { margin: 0; font-size: 1.2rem; }
-.kt-card { margin-top: 12px; padding: clamp(10px, 2vw, 20px); border: 1px solid #364054; border-radius: 18px; background: #1b2030; }
+#commandDeck #ktPractice .ctrl {
+  aspect-ratio: auto; height: 38px; min-width: 0; font: 700 .85rem system-ui; border-radius: 12px; padding-inline: 8px;
+}
+#ktPractice .ctrl:disabled { opacity: .5; cursor: default; }
+#ktPractice .ctrl option { color: var(--text); background: #202020; }
+#ktPractice .ctrl:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.kt-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.kt-dialog-head h2 { margin: 0; font-size: 1.2rem; }
 .kt-setup { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; }
 .kt-setup label, .kt-midi-controls label { display: grid; gap: 4px; min-width: 0; font-size: .78rem; color: var(--kt-muted); }
-#ktPractice button, #ktKeyboardActions button, #ktMidiDialog button { min-height: 42px; }
-#ktPractice select, #ktTempo, #ktPort {
-  min-width: 0; max-width: 100%; min-height: 40px; padding: 5px 8px;
-  border: 1px solid #55617b; border-radius: 8px; background: #252d40; color: var(--kt-ink); font: inherit; font-size: 1rem;
-}
-#ktTempo { width: 4.4rem; font-variant-numeric: tabular-nums; }
-.kt-beats { margin: 12px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+#ktMidiDialog button { min-height: 42px; }
+#ktPort { min-height: 40px; max-width: 100%; color: var(--text); background: #202020; border-radius: 10px; }
+#commandDeck #ktTempo { width: 4.25rem; font-variant-numeric: tabular-nums; }
+.kt-beats { margin: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
 .kt-beats span {
-  min-height: 48px; display: grid; place-items: center;
+  min-height: 32px; display: grid; place-items: center;
   color: var(--kt-muted); font-size: 1.35rem; font-weight: 800;
-  font-variant-numeric: tabular-nums; border: 2px solid var(--kt-edge); border-radius: 11px; background: #161b2a;
+  font-variant-numeric: tabular-nums; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(255,255,255,.05);
 }
-.kt-beats span.target { border-color: #a5adcf; color: white; }
+.kt-beats span.target { border-color: rgba(29,185,84,.9); color: white; }
 .kt-beats span.pulse { color: #16192a; background: #c6cee9; border-color: #c6cee9; }
 .kt-beats span.example { color: #1e170b; background: var(--kt-demo); border-color: var(--kt-demo); }
 .kt-beats span.played { color: #091f1b; background: var(--kt-player); border-color: var(--kt-player); }
-.kt-transport { display: flex; justify-content: center; gap: 8px; }
-.kt-transport button { min-width: 82px; }
+.kt-transport { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; }
 #ktDemo { color: var(--kt-demo); }
-#ktStart { color: #081e18; background: var(--kt-player); font-weight: 750; }
-.kt-feedback { text-align: center; margin-top: 8px; min-height: 1.45em; font-weight: 650; }
+.kt-feedback { text-align: center; margin: 0; min-height: 1.45em; font-weight: 650; }
 .kt-feedback[data-kind="on"] { color: var(--kt-player); }
 .kt-feedback[data-kind="early"], .kt-feedback[data-kind="late"], .kt-feedback[data-kind="wrong"] { color: #ffd293; }
 .kt-results { display: flex; min-height: 22px; justify-content: center; gap: 4px; margin: 4px 0 0; }
@@ -56,10 +55,6 @@ body.kt-practicing #piano .key.kt-midi-held, body.kt-practicing #piano .key.kt-p
 body.kt-practicing #piano .key.kt-example .noteLabel,
 body.kt-practicing #piano .key.kt-midi-held .noteLabel,
 body.kt-practicing #piano .key.kt-player .noteLabel { color: #16211d; }
-.kt-keyboard-actions { --kt-demo: #ffb557; --kt-player: #54debc; margin-top: 0; color: #acb4cb; font-size: .78rem; }
-.kt-keyboard-actions span { white-space: nowrap; }
-.kt-swatch { display: inline-block; width: .68em; height: .68em; border-radius: 2px; }
-.kt-swatch.demo { background: var(--kt-demo); }.kt-swatch.player { background: var(--kt-player); }
 #ktMidiDialog { width: min(calc(100% - 24px), 420px); border: 1px solid #54627f; border-radius: 14px; padding: 16px; background: #202737; }
 #ktMidiDialog::backdrop { background: #0e121bc9; }
 #ktMidiStatus { color: var(--kt-muted); overflow-wrap: anywhere; }
@@ -68,5 +63,5 @@ body.kt-practicing #piano .key.kt-player .noteLabel { color: #16211d; }
 @media (max-width: 520px) {
   .kt-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .kt-actions button { padding-inline: 8px; }
-  .kt-beats span { min-height: 43px; }
+  .kt-transport { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }

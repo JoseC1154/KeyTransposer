@@ -57,7 +57,7 @@ async function setup(t, entries = slots) {
   const tap = n => piano.querySelector('[data-midi="'+n+'"]').dispatchEvent(new w.Event('pointerup', {bubbles:true}));
   const at = time => { clock=time; const queued=[...frames.values()]; frames.clear(); queued.forEach(f=>f(time)); };
   const send = (status,note,velocity,time=clock) => port.onmidimessage({ data:[status,note,velocity], timeStamp:time });
-  const midi = async () => { click('PracticeMidi'); click('Connect'); await calm(); id('MidiDialog').close(); };
+  const midi = async () => { click('Midi'); click('Connect'); await calm(); id('MidiDialog').close(); };
   const round = async (beat='1') => { set('Tempo','120'); set('Target',beat); click('Start'); await calm(); };
   return {w,d,piano,tap,usb,port,id,set,click,at,send,midi,round,played,asked:()=>asked,pending:p=>{pending=p;}};
 }
@@ -79,7 +79,7 @@ test('Shows the demo in amber on beat 2; stopping clears scheduled sound and res
   x.click('Stop');
   assert.equal(x.played.every(o=>o.end===0),true);
   assert.equal(x.piano.querySelectorAll('.kt-example').length,0);
-  x.click('Back');
+  x.click('Open');
   assert.equal(x.id('Practice').hidden,true);
   assert.equal(x.d.body.classList.contains('kt-practicing'),false);
 });
@@ -97,7 +97,7 @@ test('MIDI input scores a chord, distinguishes release, and never changes the tr
   assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: On time');
   x.at(5700);
   assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: Missed');
-  x.click('Back');
+  x.click('Open');
   assert.equal(x.w.KTTransposer.selection().notes.length,0);
 });
 test('Unplugging before release stops practice and clears held notes', async t => {
@@ -137,7 +137,7 @@ test('One existing keyboard is reused and practice leaves the transposer selecti
   assert.equal(x.piano.querySelector('[data-midi="60"]'),original);
   assert.equal(original.classList.contains('kt-pick'),true);
   assert.deepEqual([...x.w.KTTransposer.selection().notes],[70]);
-  x.click('Back');
+  x.click('Open');
   assert.equal(original.classList.contains('kt-pick'),false);
   assert.equal(x.piano.querySelector('[data-midi="70"]').classList.contains('selected'),true);
   assert.equal(x.w.localStorage.getItem('pct_state_v1'), saved);
@@ -166,4 +166,33 @@ test('Empty current bank shows no demo or start rather than defaults or another 
   assert.equal(x.id('Chord').textContent,'No saved chords');
   x.click('Start');
   assert.equal(x.played.length,0);
+});
+
+test('Practice is a toggle in the existing deck; layout, key references and horizontal scroll are preserved', async t => {
+  const x=await setup(t);
+  const scroll = x.d.getElementById('pianoScroll');
+  scroll.scrollLeft = 210;
+  const key = x.piano.querySelector('[data-midi="60"]');
+  const native = x.d.getElementById('btnUp');
+  x.click('Open');
+  assert.equal(x.id('Practice').parentElement.id, 'commandDeck');
+  assert.equal(x.id('Open').getAttribute('aria-expanded'),'true');
+  assert.equal(x.piano.querySelector('[data-midi="60"]'), key);
+  assert.equal(scroll.scrollLeft,210);
+  assert.equal(native.disabled,false);
+  await x.round();
+  assert.equal(native.disabled,true);
+  x.click('Open');
+  assert.equal(native.disabled,false);
+  assert.equal(x.id('Open').getAttribute('aria-expanded'),'false');
+  assert.equal(scroll.scrollLeft,210);
+  assert.equal(x.played.every(o=>o.end===0),true);
+});
+test('Switching banks with the tray open updates the next round', async t => {
+  const x=await setup(t);
+  x.click('Open');
+  x.d.getElementById('btnBankNext').click();
+  assert.match(x.id('Chord').textContent,/Different bank/);
+  await x.round();
+  assert.deepEqual([...x.id('Results').children].map(el=>el.textContent),['1']);
 });

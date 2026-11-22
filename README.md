@@ -42,7 +42,7 @@ The app is designed to feel like a native tool:
 ## MIDI and Practice
 
 - Plug in your USB MIDI keyboard, open the app in Chrome or Edge, and choose **MIDI → Connect MIDI**. If your keyboard exposes several ports, pick its keyboard-note input. Held notes light up mint; **Use held notes** copies them to the transposer without saving over a memory slot.
-- Open **Practice** from the scale bank you want to use. **Example** plays its saved chords on the same piano in amber. **Start** gives you a one-bar count-in, then one bar per filled slot in slot order. Empty slots are skipped. The metronome accents beat 1; the outline marks the beat to play on. Start on beat 1, try the other beats individually, then use **Rotate 1–4**.
+- Toggle **Practice** to show the practice controls in the existing transposer deck, without moving the piano. **Example** plays its saved chords on the same piano in amber. **Start** gives you a one-bar count-in, then one bar per filled slot in slot order. Empty slots are skipped. The metronome accents beat 1; the outline marks the beat to play on. Start on beat 1, try the other beats individually, then use **Rotate 1–4**.
 - Match the example's notes and octaves. A normal slight spread between fingers counts as one attack. Early/late timing, wrong chords, and missed bars are shown separately. Release the keys between attempts. Without a controller, select notes on the screen and tap **Play selected** on the target beat.
 - Local preview: run `python3 -m http.server 8780 --bind 127.0.0.1` and visit `http://localhost:8780`. Tests: `node --test tests/practice.test.cjs`.
 

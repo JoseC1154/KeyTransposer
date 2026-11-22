@@ -800,6 +800,7 @@ function renderMemoryButtons() {
     btn.classList.toggle("active", i === activeSlot && activeBankPc === currentScalePc && activeSlot !== -1);
     btn.textContent = String(i + 1); // always numbered
   });
+  window.KTPractice?.bankChanged();
 }
 
 
@@ -1137,7 +1138,10 @@ function applyResponsiveSizing() {
 
   // Remaining height budget after topbar + controlBar + footer
   const topH = elTopbar ? elTopbar.offsetHeight : 0;
-  const controlsH = elCommandDeck ? elCommandDeck.offsetHeight : 0;
+  const practicePanel = document.getElementById("ktPractice");
+  const practiceH = practicePanel && !practicePanel.hidden && elCommandDeck
+    ? practicePanel.offsetHeight + (parseFloat(getComputedStyle(elCommandDeck).rowGap) || 0) : 0;
+  const controlsH = elCommandDeck ? elCommandDeck.offsetHeight - practiceH : 0;
   const footerH = elFooter ? elFooter.offsetHeight : 0;
   const safe = 28; // wrap padding + gaps buffer
   const availableH = Math.max(160, window.innerHeight - topH - controlsH - footerH - safe);
@@ -1274,7 +1278,7 @@ function updateSelectionUI() {
   const keys = elPiano.querySelectorAll(".key");
   for (const k of keys) {
     const midi = Number(k.dataset.midi);
-    k.classList.toggle("selected", selectedMidis.has(midi) && !window.KTPractice?.isOpen());
+    k.classList.toggle("selected", selectedMidis.has(midi));
     k.classList.toggle("kt-midi-held", window.KTPractice?.isHeld(midi) ?? false);
     window.KTPractice?.paintKey(k, midi);
   }

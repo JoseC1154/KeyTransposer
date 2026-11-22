@@ -44,8 +44,9 @@
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
   let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
   let access = null, port = null, desired = "", failedPort = null, midiEpoch = 0, portEpoch = 0;
-  let sequence = [], picked = new Set(), scrollBefore = 0, displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
+  let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, demoNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
+  const lockedControls = new Set();
   const open = () => !practice.hidden;
   const hitMode = () => $("Target").value;
   const heldNotes = () => [...new Set(held.values())];
@@ -81,7 +82,7 @@
   }
   function syncHeld() {
     paintKeys();
-    $("Capture").disabled = !heldNotes().some(n => n >= 21 && n <= 108);
+    $("Capture").disabled = launchPending || !!active || !heldNotes().some(n => n >= 21 && n <= 108);
   }
 
   function displaySlot(index) {
@@ -90,16 +91,6 @@
     const current = sequence[index], next = sequence[index + 1];
     $("Chord").textContent = current ? "Slot " + current.slot + (current.name ? " · " + current.name : "") : "No saved chords";
     $("Next").textContent = next ? "Next: Slot " + next.slot + (next.name ? " · " + next.name : "") : current ? (index + 1) + " of " + sequence.length : "";
-    if (!current) return;
-    const scroll = document.getElementById("pianoScroll");
-    const keys = current.notes.map(n => scroll.querySelector('[data-midi="' + n + '"]')).filter(Boolean);
-    if (!keys.length || !scroll.clientWidth) return;
-    const viewport = scroll.getBoundingClientRect();
-    const left = Math.min(...keys.map(k => k.getBoundingClientRect().left));
-    const right = Math.max(...keys.map(k => k.getBoundingClientRect().right));
-    if (left < viewport.left || right > viewport.right) {
-      scroll.scrollLeft += (left + right - viewport.left - viewport.right) / 2;
-    }
   }
   function renderBeats(target, pulse = -1, demo = false, played = -1) {
     const state = [target, pulse, demo, played].join();
@@ -136,11 +127,21 @@
     }
     audioNodes.clear();
   }
+  function lockExistingControls() {
+    for (const button of document.querySelectorAll("#btnClear, #btnMenu, #ktCapture, #commandDeck > div button, #memoryGrid button")) {
+      if (!button.disabled) {
+        button.disabled = true;
+        lockedControls.add(button);
+      }
+    }
+  }
   function stop(message = "") {
     runId++;
     launchPending = false;
     cancelAnimationFrame(frame);
     active = null;
+    for (const button of lockedControls) button.disabled = false;
+    lockedControls.clear();
     stopSound();
     resetAttempt();
     demoNotes = []; touchNotes = []; touchUntil = 0;
@@ -149,31 +150,38 @@
     $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
     refreshIdle();
-    paintKeys();
+    syncHeld();
     if (message) feedback(message);
   }
   function closePractice() {
     stop();
-    practice.hidden = $("KeyboardActions").hidden = true;
+    practice.hidden = true;
+    $("Open").setAttribute("aria-expanded", "false");
     document.body.classList.remove("kt-practicing");
-    document.getElementById("pianoScroll").scrollLeft = scrollBefore;
     syncHeld();
-    $("Open").focus();
+    $("Open").focus({ preventScroll: true });
   }
+  function refreshBank() {
+    if (!open() || active || launchPending) return;
+    const next = api.chords().filter(Boolean).map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
+    if (JSON.stringify(next) === JSON.stringify(sequence) && displayed >= 0) return;
+    sequence = next;
+    displayed = -1;
+    displaySlot(0);
+    renderResults();
+    $("Demo").disabled = $("Start").disabled = !sequence.length;
+    feedback(sequence.length ? "Choose Example or Start" : "Save a chord in a memory slot first.");
+    paintKeys();
+  }
+  window.KTPractice.bankChanged = refreshBank;
   function openPractice() {
-    sequence = api.chords().filter(Boolean).map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
-    scrollBefore = document.getElementById("pianoScroll").scrollLeft;
-    practice.hidden = $("KeyboardActions").hidden = false;
+    practice.hidden = false;
+    $("Open").setAttribute("aria-expanded", "true");
     document.body.classList.add("kt-practicing");
     picked.clear();
     displayed = -1;
-    displaySlot(0);
-    paintKeys();
-    renderResults();
+    refreshBank();
     refreshIdle();
-    $("Demo").disabled = $("Start").disabled = !sequence.length;
-    feedback(sequence.length ? "Choose Example or Start" : "Save a chord in a memory slot first.");
-    $(sequence.length ? "Start" : "Back").focus();
   }
   async function unlockAudio() {
     const Audio = window.AudioContext || window.webkitAudioContext;
@@ -288,9 +296,11 @@
     frame = requestAnimationFrame(tick);
   }
   async function launch(demo) {
+    refreshBank();
     if (active || launchPending || !sequence.length) return;
     const token = ++runId;
     launchPending = true;
+    lockExistingControls();
     $("Demo").disabled = $("Start").disabled = true;
     $("Stop").hidden = false;
     try {
@@ -396,9 +406,8 @@
       announceMidi(e?.name === "NotAllowedError" || e?.name === "SecurityError" ? "MIDI permission denied" : "Could not connect MIDI");
     }
   }
-  $("Open").addEventListener("click", openPractice);
-  $("Back").addEventListener("click", closePractice);
-  for (const id of ["Midi", "PracticeMidi"]) $(id).addEventListener("click", () => {
+  $("Open").addEventListener("click", () => open() ? closePractice() : openPractice());
+  $("Midi").addEventListener("click", () => {
     if (active || launchPending) stop("Stopped");
     dialog.showModal();
   });
