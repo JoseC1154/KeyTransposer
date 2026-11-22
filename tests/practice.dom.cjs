@@ -571,7 +571,7 @@ test('Practice shows the target, keeps pedal tails distinct, and restarts on a w
   x.at(5140);
   assert.deepEqual(notes('.kt-guide'),slots[1].midis);
   assert.deepEqual(notes('.kt-midi-sustain'),slots[0].midis);
-  x.send(0x90,72,90); x.send(0x80,72,64);
+  x.send(0x90,73,90); x.send(0x80,73,64);
   assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
   assert.deepEqual(notes('.kt-guide'),slots[0].midis);
   assert.match(x.id('Chord').textContent,/Slot 1 ·/);
@@ -598,7 +598,7 @@ test('A correct chord with loose timing still advances; wrong notes still restar
   assert.equal(x.id('Feedback').textContent,'Correct · 1840 ms late');
   assert.match(x.id('Chord').textContent,/Slot 11 ·/);
   x.at(7200);
-  x.send(0x90,72,90); x.send(0x80,72,64);
+  x.send(0x90,73,90); x.send(0x80,73,64);
   assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
   assert.match(x.id('Chord').textContent,/Slot 1 ·/);
 });
@@ -763,4 +763,24 @@ test('Lightbox backdrops close, and clicking outside chord naming cancels that s
   await calm();
   assert.equal(prompt.hidden,true);
   assert.equal(JSON.parse(x.w.localStorage.getItem('pct_state_v1')).bankChords[0][2],null);
+});
+
+test('An octave-up descending roll scores even when each key is released before the next', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  for (const [i,n] of [79,76,72].entries()) {
+    x.at(3140+i*145); x.send(0x90,n,90); x.send(0x80,n,64);
+    if (i<2) assert.match(x.id('Chord').textContent,/Slot 1 ·/);
+  }
+  assert.equal(x.id('Feedback').textContent,'On time');
+  assert.match(x.id('Chord').textContent,/Slot 4 ·/);
+});
+test('Rolling the right voicing past the next beat does not pass', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  for (const [i,n] of slots[0].midis.entries()) {
+    x.at(4950+i*100); x.send(0x90,n,90); x.send(0x80,n,64);
+  }
+  assert.equal(x.id('Feedback').textContent,'Missed · Count in again');
+  assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: pending');
 });

@@ -42,8 +42,8 @@ test('Uniform octave shifts count, but altered voicings, extra notes and excessi
   const p = makePlan(0,120,'1');
   for(const notes of [[60,64],[60,64,67,72],[60,67,76],[61,65,68]]) assert.equal(score(p,notes,triad,2000).result,'wrong');
   for(const notes of [[48,52,55],[72,76,79],[84,88,91]]) assert.equal(score(p,notes,triad,2000).result,'on');
-  assert.equal(score(p,[67,60,64],triad,2000,2155).result,'on');
-  assert.equal(score(p,triad,triad,2000,2156).result,'wrong');
+  assert.equal(score(p,[67,60,64],triad,2000,2350).result,'on');
+  assert.equal(score(p,triad,triad,2000,2351).result,'wrong');
 });
 test('MIDI decodes channels, note-off and zero velocity; ignores CC', () => {
   assert.deepEqual(midiMessage([0x94,60,72]),{key:'4:60',note:60,down:true});

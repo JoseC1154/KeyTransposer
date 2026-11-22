@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v20-flexible-chord-timing";
+const CACHE_NAME = "piano-transposer-v21-rolled-chords";
 const ASSETS = [
   "./",
   "./index.html",

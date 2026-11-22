@@ -1,12 +1,20 @@
 (() => {
   "use strict";
-  const NOTE_SPREAD = 155;
+  const NOTE_SPREAD = 350;
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
   const uniqueNotes = notes => [...new Set(notes.filter(n => Number.isInteger(n) && n >= 21 && n <= 108))].sort((a, b) => a - b);
   function sameVoicing(a, b) {
     if (!a.length || a.length !== b.length) return false;
     const shift = a[0] - b[0];
     return shift % 12 === 0 && a.every((note, i) => note - b[i] === shift);
+  }
+  function canCompleteVoicing(notes, expected) {
+    const actual = uniqueNotes([...notes]), target = uniqueNotes(expected);
+    if (!actual.length || actual.length >= target.length) return false;
+    return target.some(anchor => {
+      const shift = actual[0] - anchor;
+      return shift % 12 === 0 && actual.every(n => target.includes(n - shift));
+    });
   }
   const METERS = {
     "2/4": { count: 2, split: 1, accents: [] },
@@ -618,7 +626,10 @@
       held.delete(msg.key);
       if (!held.size) {
         waitRelease = false;
-        flushAttempt();
+        const target = active?.plan.targets.find(t => !t.result);
+        const canRoll = attempt && target && clock < target.deadline
+          && clock - attempt.first < NOTE_SPREAD && canCompleteVoicing(attempt.notes, target.notes);
+        if (!canRoll) flushAttempt();
       }
       syncHeld();
       return;
