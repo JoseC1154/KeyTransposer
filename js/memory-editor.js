@@ -32,6 +32,7 @@
     $("slotEditorCurrent").textContent = chord ? (chord.name || "Unnamed chord") + " · " + api.noteNames(chord.midis) : "Empty";
     for (const key of ["load", "rename", "copy", "cut", "clear"]) buttons[key].disabled = !chord;
     buttons.save.disabled = !current.notes.length;
+    buttons.save.textContent = chord ? "Save over slot" : "Save";
     buttons.paste.disabled = !clipboard || (clipboard.kind === "cut" && sameSlot(clipboard.location, current));
     say(clipboard ? recommendTarget() : "");
   }
@@ -39,7 +40,7 @@
     pending = { kind, value, existing: get(current) };
     actions.hidden = true;
     form.hidden = false;
-    const naming = kind === "save" || kind === "rename";
+    const naming = kind === "rename";
     $("slotEditorNameLabel").hidden = !naming;
     name.disabled = !naming;
     name.value = naming ? value.name : "";
@@ -105,8 +106,10 @@
       };
       close(recommendTarget());
     } else if (kind === "save") {
-      const text = stored ? "Replace this saved chord with the selected notes?" : "Save the selected notes here.";
-      begin(kind,{midis:current.notes,name:stored?.name || api.nameFor(current.notes)}, text, stored ? "Replace" : "Save");
+      if (!current.notes.length) return;
+      const customName = stored?.name && stored.name !== api.nameFor(stored.midis) ? stored.name : "";
+      const value = {midis:current.notes, name:customName || api.nameFor(current.notes)};
+      apply([{...current, value}], "Saved " + label(current));
     } else if (kind === "rename") {
       begin(kind,{midis:stored.midis.slice(),name:stored.name},"", "Save name");
     } else if (kind === "clear") {
@@ -123,7 +126,7 @@
     if (get(current) !== existing) { resetForm(); update(); say("This slot changed. Choose the action again."); return; }
     if (kind === "paste") { paste(); return; }
     const saved = kind === "clear" ? null : {...value, name: name.value.trim() || value.name};
-    apply([{...current, value:saved}], (kind === "clear" ? "Cleared " : kind === "rename" ? "Renamed " : "Saved ") + label(current));
+    apply([{...current, value:saved}], (kind === "clear" ? "Cleared " : "Renamed ") + label(current));
   });
   const transpose = $("transposeSlotsModal");
   const previewDown = $("transposePreviewDown"), previewUp = $("transposePreviewUp");

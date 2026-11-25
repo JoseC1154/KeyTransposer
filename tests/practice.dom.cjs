@@ -269,13 +269,45 @@ test('Edit is opt-in and Save stores selected notes; Rename leaves their voicing
   e.toggle();
   for (const note of [60,64,67]) { if (!x.w.KTTransposer.selection().notes.includes(note)) x.tap(note); }
   e.slot(2); e.act('save');
-  e.$('slotEditorName').value='New name'; e.submit();
-  assert.deepEqual(e.saved(2),{name:'New name',midis:[60,64,67]});
+  assert.deepEqual(e.saved(2),{name:x.w.KTChordMemory.nameFor([60,64,67]),midis:[60,64,67]});
+  assert.equal(e.$('slotEditor').open,false);
+  assert.equal(e.$('slotEditorConfirm').hidden,true);
   e.slot(2); e.act('rename');
   e.$('slotEditorName').value='Renamed'; e.submit();
   assert.deepEqual(e.saved(2),{name:'Renamed',midis:[60,64,67]});
   e.toggle(); e.slot(2);
   assert.equal(e.$('slotEditor').open,false);
+});
+test('Replacing a chord in one click updates an automatic name but preserves a custom name', async t => {
+  const x=await setup(t,[]), e=editHarness(x);
+  e.toggle();
+  const initial=[60,64,67], transposed=[61,65,68];
+  for(const note of initial) x.tap(note);
+  for(const slot of [1,2]) {e.slot(slot); e.act('save');}
+  e.slot(2); e.act('rename'); e.$('slotEditorName').value='Intro'; e.submit();
+  e.$('btnUp').click();
+  for(const slot of [1,2]) {
+    e.slot(slot); e.act('save');
+    assert.equal(e.$('slotEditor').open,false);
+    assert.deepEqual(e.saved(slot).midis,transposed);
+  }
+  assert.equal(e.saved(1).name,x.w.KTChordMemory.nameFor(transposed));
+  assert.equal(e.saved(2).name,'Intro');
+});
+test('Save is disabled without selected notes and a storage error leaves the slot unchanged', async t => {
+  const x=await setup(t), e=editHarness(x);
+  e.toggle(); e.slot(1);
+  assert.equal(e.button('save').disabled,true);
+  e.$('slotEditorClose').click();
+  x.tap(62); e.slot(1);
+  const before=e.saved(1);
+  const fn=x.w.Storage.prototype.setItem;
+  x.w.Storage.prototype.setItem=()=>{throw new Error('Quota');};
+  try {e.act('save');} finally {x.w.Storage.prototype.setItem=fn;}
+  assert.equal(e.$('slotEditor').open,true);
+  assert.equal(e.$('slotEditorConfirm').hidden,true);
+  assert.match(e.$('slotEditorMessage').textContent,/No slots were changed/);
+  assert.deepEqual(e.saved(1),before);
 });
 test('Copy can paste to an empty slot in another bank without changing the original', async t => {
   const x=await setup(t), e=editHarness(x);
@@ -319,7 +351,7 @@ test('Practice selections can be saved in Edit; Clear requires confirmation', as
   const x=await setup(t,[]), e=editHarness(x);
   x.click('Open'); e.toggle();
   for (const note of [62,65,69]) x.tap(note);
-  e.slot(1); e.act('save'); e.submit();
+  e.slot(1); e.act('save');
   assert.deepEqual(e.saved(1).midis,[62,65,69]);
   assert.equal(x.id('Start').disabled,false);
   e.slot(1); e.act('clear');
@@ -373,9 +405,8 @@ test('Load notes, edit a saved voicing and replace it without leaving Edit mode'
   const picked = () => [...x.piano.querySelectorAll('.kt-pick')].map(el=>Number(el.dataset.midi)).sort((a,b)=>a-b);
   assert.deepEqual(picked(),[60,64,67]);
   x.tap(64); x.tap(63);
-  e.slot(1); e.act('save');
-  assert.equal(e.$('slotEditorName').value,'C major');
-  e.submit();
+  e.slot(1); assert.equal(e.button('save').textContent,'Save over slot'); e.act('save');
+  assert.equal(e.$('slotEditor').open,false);
   assert.deepEqual(e.saved(1).midis,[60,63,67]);
   e.$('btnClear').click();
   assert.deepEqual(picked(),[]);
@@ -385,13 +416,13 @@ test('Load notes, edit a saved voicing and replace it without leaving Edit mode'
 test('Save, transpose up, save again and reload: both slots stay in the same bank', async t => {
   const x=await setup(t,[]), e=editHarness(x);
   for (const note of [60,64,67]) x.tap(note);
-  e.toggle(); e.slot(1); e.act('save'); e.submit();
+  e.toggle(); e.slot(1); e.act('save');
   const before=x.w.localStorage.getItem('pct_state_v1');
   e.$('btnUp').click();
   assert.equal(x.w.localStorage.getItem('pct_state_v1'),before);
   assert.equal(e.$('btnBankCurrent').textContent,'C');
   assert.deepEqual([...x.w.KTTransposer.selection().notes],[61,65,68]);
-  e.slot(2); e.act('save'); e.submit();
+  e.slot(2); e.act('save');
   assert.deepEqual(e.saved(1).midis,[60,64,67]);
   assert.deepEqual(e.saved(2).midis,[61,65,68]);
   assert.equal(e.saved(1,1).name,'Different bank');
@@ -408,11 +439,11 @@ test('Transpose changes the actual Practice selection and save uses the shifted 
   const x=await setup(t,[]), e=editHarness(x);
   x.click('Open');
   for (const note of [60,64,67]) x.tap(note);
-  e.toggle(); e.slot(1); e.act('save'); e.submit();
+  e.toggle(); e.slot(1); e.act('save');
   e.$('btnUp').click();
   const keys = [...x.piano.querySelectorAll('.kt-pick')].map(el=>Number(el.dataset.midi)).sort((a,b)=>a-b);
   assert.deepEqual(keys,[61,65,68]);
-  e.slot(2); e.act('save'); e.submit();
+  e.slot(2); e.act('save');
   assert.deepEqual(e.saved(1).midis,[60,64,67]);
   assert.deepEqual(e.saved(2).midis,[61,65,68]);
   e.toggle();
