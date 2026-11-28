@@ -617,10 +617,10 @@ test('Practice shows the target, keeps pedal tails distinct, and restarts on a w
 test('A correct chord with loose timing still advances; wrong notes still restart', async t => {
   const x=await setup(t);
   x.click('Open'); await x.midi(); await x.round();
-  x.at(3060);
+  x.at(3040);
   for (const n of slots[0].midis) x.send(0x90,n,90);
   for (const n of slots[0].midis) x.send(0x80,n,64);
-  assert.equal(x.id('Feedback').textContent,'Correct · 80 ms early');
+  assert.equal(x.id('Feedback').textContent,'Correct · 100 ms early');
   assert.match(x.id('Chord').textContent,/Slot 4 ·/);
   x.at(6980);
   slots[1].midis.forEach((n,i)=>x.send(0x90,n,90,6980+i*65));
@@ -800,7 +800,7 @@ test('An octave-up descending roll scores even when each key is released before 
   const x=await setup(t);
   x.click('Open'); await x.midi(); await x.round();
   for (const [i,n] of [79,76,72].entries()) {
-    x.at(3140+i*145); x.send(0x90,n,90); x.send(0x80,n,64);
+    x.at(3140+i*200); x.send(0x90,n,90); x.send(0x80,n,64);
     if (i<2) assert.match(x.id('Chord').textContent,/Slot 1 ·/);
   }
   assert.equal(x.id('Feedback').textContent,'On time');
@@ -846,7 +846,7 @@ test('Memory-slot resonance follows held keys and overlapping pedal tails', asyn
   x.click('Open'); await x.midi(); await x.round();
   x.at(3140); x.send(0xb0,64,127);
   for (const n of slots[0].midis) x.send(0x90,n,90);
-  await new Promise(resolve=>setTimeout(resolve,390));
+  await new Promise(resolve=>setTimeout(resolve,460));
   assert.equal(state(1),'held');
   x.at(3730);
   assert.equal(state(1),'held');
@@ -1048,7 +1048,7 @@ test('Timing log is opt-in and compares actual MIDI attacks and grading with the
   const [start,retry] = trace.events.filter(e=>e.type==='plan');
   assert.equal(start.bpm,120);
   assert.equal(start.meter,'4/4');
-  assert.deepEqual(start.targets[0],{slot:1,beat:1,expectedMidi:[60,64,67],targetMs:2140,opensMs:2008,deadlineMs:4140});
+  assert.deepEqual(start.targets[0],{slot:1,beat:1,expectedMidi:[60,64,67],targetMs:2140,opensMs:1948,deadlineMs:4140});
   assert.equal(retry.reason,'retry: wrong');
   const attacks = trace.events.filter(e=>e.type==='note-on');
   assert.deepEqual(attacks.map(e=>[e.midi,e.offsetMs,e.receiveDelayMs,e.reason]),[

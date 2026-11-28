@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const NOTE_SPREAD = 350;
+  const NOTE_SPREAD = 420;
   const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
   const uniqueNotes = notes => [...new Set(notes.filter(n => Number.isInteger(n) && n >= 21 && n <= 108))].sort((a, b) => a - b);
   function sameVoicing(a, b) {
@@ -28,8 +28,8 @@
   function makePlan(start, bpm, beat, bars = 8, meter = "4/4") {
     const { count, split, accents } = meterFor(meter);
     const step = 60000 / bpm / split;
-    const tolerance = clamp(step * .11, 55, 100);
-    const window = Math.min(step * .45, tolerance * 2.4);
+    const tolerance = clamp(step * .16, 70, 140);
+    const window = Math.min(step * .45, tolerance * 2.4, 280);
     const targets = Array.from({ length: bars }, (_, i) => {
       const hit = beat === "rotate" ? i % count + 1 : clamp(Number(beat) || 1, 1, count);
       return { time: start + ((i + 1) * count + hit - 1) * step, beat: hit, result: null };

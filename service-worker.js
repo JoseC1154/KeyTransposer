@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v29-practice-space-shortcut";
+const CACHE_NAME = "piano-transposer-v30-practice-timing-grace";
 const ASSETS = [
   "./",
   "./index.html",

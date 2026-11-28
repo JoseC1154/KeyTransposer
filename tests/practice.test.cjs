@@ -20,10 +20,10 @@ test('Rotate gives each beat a bar, including a one-beat gap from 4 back to 1', 
 });
 test('Beat tolerance distinguishes on time, early and late', () => {
   const p = makePlan(0, 120, '1'), t = p.targets[0].time;
-  assert.equal(score(p,triad,triad,t-55,t+10).result,'on');
-  assert.equal(score(p,triad,triad,t+55,t+65).result,'on');
-  assert.equal(score(p,triad,triad,t-56,t).result,'early');
-  assert.equal(score(p,triad,triad,t+56,t+60).result,'late');
+  assert.equal(score(p,triad,triad,t-80,t+10).result,'on');
+  assert.equal(score(p,triad,triad,t+80,t+85).result,'on');
+  assert.equal(score(p,triad,triad,t-81,t).result,'early');
+  assert.equal(score(p,triad,triad,t+81,t+85).result,'late');
 });
 test('Count-in does not count; a correct chord is accepted late until the next target beat', () => {
   const p = makePlan(0, 120, '1');
@@ -42,8 +42,8 @@ test('Uniform octave shifts count, but altered voicings, extra notes and excessi
   const p = makePlan(0,120,'1');
   for(const notes of [[60,64],[60,64,67,72],[60,67,76],[61,65,68]]) assert.equal(score(p,notes,triad,2000).result,'wrong');
   for(const notes of [[48,52,55],[72,76,79],[84,88,91]]) assert.equal(score(p,notes,triad,2000).result,'on');
-  assert.equal(score(p,[67,60,64],triad,2000,2350).result,'on');
-  assert.equal(score(p,triad,triad,2000,2351).result,'wrong');
+  assert.equal(score(p,[67,60,64],triad,2000,2420).result,'on');
+  assert.equal(score(p,triad,triad,2000,2421).result,'wrong');
 });
 test('MIDI decodes channels, note-off and zero velocity; ignores CC', () => {
   assert.deepEqual(midiMessage([0x94,60,72]),{key:'4:60',note:60,down:true});
@@ -81,4 +81,16 @@ test('Cutoffs use the next assigned beat in Rotate and the end of the final bar'
   p.targets[0].result='on';
   assert.equal(score(p,triad,triad,5999).result,'late');
   assert.equal(score(p,triad,triad,6000),null);
+});
+
+test('Practice grace at 72 BPM accepts earlier starts and slower rolls, but not after the cutoff', () => {
+  const p = makePlan(0,72,'1',2), {time:t, deadline} = p.targets[0];
+  assert.equal(p.window,280);
+  assert.ok(p.tolerance > 130 && p.tolerance < 140);
+  assert.equal(score(p,triad,triad,t-280,t+130).result,'early');
+  assert.equal(score(p,triad,triad,t-281,t+130),null);
+  assert.equal(score(p,triad,triad,t+125).result,'on');
+  assert.equal(score(p,triad,triad,t+408).result,'late');
+  assert.equal(score(p,triad,triad,deadline-10,deadline),null);
+  assert.equal(score(p,[60,64,68],triad,t-250,t+150).result,'wrong');
 });
