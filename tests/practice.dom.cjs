@@ -1122,3 +1122,37 @@ test('Space starts and stops Practice, including count-in, without repeating or 
   assert.equal(x.id('Feedback').textContent,'Stopped');
   assert.equal(x.id('Stop').hidden,true);
 });
+
+test('Fresh chord notes score even while a previous chord key still overlaps', async t => {
+  const x = await setup(t);
+  x.click('Open'); await x.midi(); await x.round();
+  x.at(3140);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of [60,67]) x.send(0x80,n,0);
+  // Keep E4 physically held into the next bar. Flush the earlier batch as the
+  // first new note arrives, the same way a delayed browser timer is handled.
+  x.at(5139);
+  for (const n of slots[1].midis) x.send(0x90,n,90);
+  for (const n of slots[1].midis) x.send(0x80,n,0);
+  assert.equal(x.id('Feedback').textContent,'On time');
+  assert.deepEqual([...x.id('Results').children].slice(0,2).map(el=>el.getAttribute('aria-label')),
+    ['Slot 1: On time','Slot 4: On time']);
+  assert.equal(x.piano.querySelector('[data-midi="64"]').classList.contains('kt-midi-held'),true);
+});
+
+test('A shared held note is not counted again until released and re-struck', async t => {
+  const x = await setup(t,[slots[0], {slot:4, name:'C minor', midis:[60,63,67]}]);
+  x.click('Open'); await x.midi(); await x.round();
+  x.at(3140);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of [64,67]) x.send(0x80,n,0);
+  x.at(5139);
+  x.send(0x90,60,90); // Duplicate note-on for the still-held C4.
+  for (const n of [63,67]) x.send(0x90,n,90);
+  for (const n of [63,67]) x.send(0x80,n,0);
+  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: pending');
+  x.send(0x80,60,0);
+  x.at(5190);
+  x.send(0x90,60,90); x.send(0x80,60,0);
+  assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: On time');
+});

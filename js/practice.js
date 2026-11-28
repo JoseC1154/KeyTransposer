@@ -67,7 +67,7 @@
   const api = window.KTTransposer;
   const statusText = { on: "On time", wrong: "Wrong chord", miss: "Missed" };
   let audio, audioNodes = new Set(), active = null, runId = 0, frame = 0, launchPending = false;
-  let held = new Map(), waitRelease = false, attempt = null, flushTimer = 0;
+  let held = new Map(), attempt = null, flushTimer = 0;
   const pedalDown = new Set(), sustained = new Map(), heldAttacks = new Map();
   const sustainFadeMs = 2400;
   const liveVoices = new Map();
@@ -497,7 +497,6 @@
   function resetAttempt() {
     attempt = null;
     clearTimeout(flushTimer);
-    waitRelease = held.size > 0;
   }
   function stopSound() {
     for (const oscillator of audioNodes) {
@@ -723,6 +722,7 @@
       startRound(false, statusText.wrong, "wrong");
       return true;
     }
+    resetAttempt();
     target.result = "on";
     target.timing = result;
     const label = result === "on" ? statusText.on
@@ -773,7 +773,7 @@
     const batch = attempt;
     attempt = null;
     clearTimeout(flushTimer);
-    submit([...batch.notes], batch.first, batch.last, batch.attacks);
+    return submit([...batch.notes], batch.first, batch.last, batch.attacks);
   }
   function processNote(msg, clock, velocity, receivedAt, stamp) {
     const traceNote = recording && practiceRunning();
@@ -796,10 +796,11 @@
         sustained.set(msg.key, { note: msg.note, channel, time: performance.now(), attack: heldAttacks.get(msg.key) });
         releaseLiveVoice(msg.key, sustainFadeMs / 1000);
       } else if (wasHeld) releaseLiveVoice(msg.key, .13);
+      const releasedAttack = heldAttacks.get(msg.key);
       held.delete(msg.key);
       heldAttacks.delete(msg.key);
-      if (!held.size) {
-        waitRelease = false;
+      if (attempt?.down.delete(releasedAttack) && !attempt.down.size) {
+        // Only releases from this chord matter. Older held notes and pedal tails are separate.
         const target = active?.plan.targets.find(t => !t.result);
         const canRoll = attempt && target && clock < target.deadline
           && clock - attempt.first < NOTE_SPREAD && canCompleteVoicing(attempt.notes, target.notes);
@@ -818,30 +819,21 @@
     heldAttacks.set(msg.key, attack);
     startLiveVoice(msg.key, msg.note, velocity);
     syncHeld();
-    if (!practiceRunning() || waitRelease) {
-      logNote("waiting for keys to release");
-      return;
-    }
-    if (attempt && clock - attempt.first > NOTE_SPREAD) {
-      logNote("outside chord collection window");
-      flushAttempt();
-      waitRelease = true;
+    if (!practiceRunning()) return;
+    if (attempt && clock - attempt.first > NOTE_SPREAD && flushAttempt()) {
+      logNote("previous attempt restarted practice");
       return;
     }
     if (!attempt) {
-      // Previously held keys don't count as a fresh attack.
-      if (held.size > 1) {
-        logNote("another key already held");
-        waitRelease = true;
-        return;
-      }
-      attempt = { first: clock, last: clock, notes: new Set(), attacks: new Set() };
-      flushTimer = setTimeout(() => { flushAttempt(); waitRelease = held.size > 0; }, NOTE_SPREAD + 12);
+      // A chord is built from fresh key presses, never from the whole held keyboard.
+      attempt = { first: clock, last: clock, notes: new Set(), attacks: new Set(), down: new Set() };
+      flushTimer = setTimeout(flushAttempt, NOTE_SPREAD + 12);
     }
     logNote("collected");
     attempt.last = Math.max(clock, attempt.last);
     attempt.notes.add(msg.note);
     attempt.attacks.add(attack);
+    attempt.down.add(attack);
     // Let the short window finish so an unintended extra note cannot be ignored.
   }
   function tick() {
