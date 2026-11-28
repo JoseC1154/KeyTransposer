@@ -162,6 +162,7 @@
     $("PianoSoundLabel").hidden = $("SizeLabel").hidden = !port;
     api.setMidiLayout(port ? Number(midiSize.value) : null);
   }
+  let reverseOrder = false;
   let sequence = [], picked = new Set(), displayed = -1, glowBeat = -1, glowUntil = 0, glowSlot = -1, demoNotes = [], guideNotes = [], touchNotes = [], touchUntil = 0;
   let lastVisual = "", lastFeedback = "";
   // A round has its own touch selection, separate from the loaded/editor chord.
@@ -531,7 +532,7 @@
     $("Demo").disabled = $("Start").disabled = !sequence.length;
     $("Stop").hidden = true;
     $("Click").disabled = false;
-    $("Loop").disabled = false;
+    $("Loop").disabled = $("Reverse").disabled = false;
     $("Click").setAttribute("aria-pressed", "false");
     $("Click").textContent = "Metronome";
     refreshIdle();
@@ -556,6 +557,7 @@
     syncSlotResonance();
     const next = chords.filter(c => c && !skipped?.has(c.slot))
       .map(c => ({ ...c, notes: uniqueNotes(c.notes) })).filter(c => c.notes.length);
+    if (reverseOrder) next.reverse();
     if (JSON.stringify(next) === JSON.stringify(sequence) && displayed >= 0) return;
     sequence = next;
     displayed = -1;
@@ -671,6 +673,7 @@
     $("Demo").disabled = $("Start").disabled = true;
     $("Click").setAttribute("aria-pressed", "true");
     $("Click").textContent = "Stop click";
+    $("Reverse").disabled = true;
     for (const id of ["Tempo", "Target", "Meter"]) $(id).disabled = true;
     try {
       await unlockAudio();
@@ -936,7 +939,7 @@
     const token = ++runId;
     launchPending = true;
     setRoundMode(demo ? "demo" : "practice");
-    $("Loop").disabled = true;
+    $("Loop").disabled = $("Reverse").disabled = true;
     paintKeys();
     lockExistingControls();
     $("Click").disabled = true;
@@ -1083,6 +1086,13 @@
   $("Loop").addEventListener("click", () => {
     const button = $("Loop");
     button.setAttribute("aria-pressed", button.getAttribute("aria-pressed") === "true" ? "false" : "true");
+  });
+  $("Reverse").addEventListener("click", () => {
+    if (active || launchPending) return;
+    reverseOrder = !reverseOrder;
+    $("Reverse").setAttribute("aria-pressed", String(reverseOrder));
+    $("Reverse").textContent = reverseOrder ? "12 → 1" : "1 → 12";
+    refreshBank();
   });
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));

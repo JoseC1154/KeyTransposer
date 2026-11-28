@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v31-practice-overlapping-keys";
+const CACHE_NAME = "piano-transposer-v32-practice-reverse-order";
 const ASSETS = [
   "./",
   "./index.html",

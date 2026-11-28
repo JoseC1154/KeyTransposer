@@ -1156,3 +1156,39 @@ test('A shared held note is not counted again until released and re-struck', asy
   x.send(0x90,60,90); x.send(0x80,60,0);
   assert.equal(x.id('Results').children[1].getAttribute('aria-label'),'Slot 4: On time');
 });
+
+test('Reverse plays filled unskipped slots high to low in Practice, Loop and Example without changing memory', async t => {
+  const x = await setup(t,[...slots,{slot:12,name:'D major',midis:[62,66,69]}]);
+  const saved=x.w.localStorage.getItem('pct_state_v1');
+  x.click('Open');
+  const slot4=x.d.querySelector('#memoryGrid button[data-slot="3"]');
+  slot4.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+  x.click('Reverse');
+  assert.equal(x.id('Reverse').textContent,'12 → 1');
+  assert.equal(x.id('Reverse').getAttribute('aria-pressed'),'true');
+  assert.match(x.id('Chord').textContent,/Slot 12 ·/);
+  x.set('Tempo','120'); x.click('Demo'); await calm();
+  assert.equal(x.id('Reverse').disabled,true);
+  for (const [time,slot] of [[3140,12],[5140,11],[7140,1]]) {
+    x.at(time);
+    assert.equal(x.d.querySelector('#memoryGrid [data-kt-playing="example"]').dataset.slot,String(slot-1));
+  }
+  x.click('Stop');
+  await x.midi();
+  x.click('Loop');
+  await x.round();
+  assert.deepEqual([...x.id('Results').children].map(e=>e.textContent),['12','11','1']);
+  for (const [time,notes] of [[9280,[62,66,69]],[11280,slots[2].midis],[13280,slots[0].midis],[15280,[62,66,69]]]) {
+    x.at(time);
+    for (const n of notes) x.send(0x90,n,90);
+    for (const n of notes) x.send(0x80,n,0);
+    assert.equal(x.id('Feedback').textContent,'On time');
+  }
+  x.click('Stop');
+  assert.equal(x.id('Reverse').disabled,false);
+  x.click('Reverse');
+  assert.equal(x.id('Reverse').textContent,'1 → 12');
+  assert.match(x.id('Chord').textContent,/Slot 1 ·/);
+  assert.match(x.id('Next').textContent,/Slot 11 ·/);
+  assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
+});
