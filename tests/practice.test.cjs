@@ -94,3 +94,12 @@ test('Practice grace at 72 BPM accepts earlier starts and slower rolls, but not 
   assert.equal(score(p,triad,triad,deadline-10,deadline),null);
   assert.equal(score(p,[60,64,68],triad,t-250,t+150).result,'wrong');
 });
+
+test('Rhythm pairs repeat the same bar index and finish at the next requested hit', () => {
+  const p=makePlan(0,120,'hits-12',2,'4/4');
+  assert.deepEqual(p.targets.map(t=>[t.barIndex,t.beat,t.time,t.deadline]),
+    [[0,1,2000,2500],[0,2,2500,4000],[1,1,4000,4500],[1,2,4500,6000]]);
+  assert.deepEqual(makePlan(0,120,'hits-34',1).targets.map(t=>t.time),[3000,3500]);
+  assert.deepEqual(makePlan(0,120,'hits-34',1,'3/4').targets.map(t=>t.beat),[1]);
+  assert.equal(makePlan(0,120,'hold-13',1).targets[0].releaseAt,3500);
+});

@@ -25,18 +25,32 @@
     "7/8": { count: 7, split: 1, accents: [2, 4] },
   };
   const meterFor = name => Object.hasOwn(METERS, name) ? METERS[name] : METERS["4/4"];
+  const RHYTHMS = [
+    { id: "hits-12", label: "Hit 1 + 2", hits: [1, 2] },
+    { id: "hits-34", label: "Hit 3 + 4", hits: [3, 4] },
+    { id: "hits-13", label: "Hit 1 + 3", hits: [1, 3] },
+    { id: "hits-24", label: "Hit 2 + 4", hits: [2, 4] },
+    { id: "hits-1234", label: "Hit all 4", hits: [1, 2, 3, 4], max: 4 },
+    { id: "hold-13", label: "Hold 1–3", hits: [1], through: 3 },
+  ];
+  const rhythmsFor = count => RHYTHMS.filter(r => Math.max(r.through || 0, ...r.hits) <= count && (!r.max || count <= r.max));
   function makePlan(start, bpm, beat, bars = 8, meter = "4/4") {
     const { count, split, accents } = meterFor(meter);
     const step = 60000 / bpm / split;
     const tolerance = clamp(step * .16, 70, 140);
     const window = Math.min(step * .45, tolerance * 2.4, 280);
+    const rhythm = rhythmsFor(count).find(r => r.id === beat);
     const targets = Array.from({ length: bars }, (_, i) => {
-      const hit = beat === "rotate" ? i % count + 1 : clamp(Number(beat) || 1, 1, count);
-      return { time: start + ((i + 1) * count + hit - 1) * step, beat: hit, result: null };
-    });
+      const hits = rhythm?.hits || [beat === "rotate" ? i % count + 1 : clamp(Number(beat) || 1, 1, count)];
+      const barStart = start + (i + 1) * count * step;
+      return hits.map(hit => ({
+        time: barStart + (hit - 1) * step, beat: hit, barIndex: i, result: null,
+        releaseAt: rhythm?.through ? barStart + rhythm.through * step : null,
+      }));
+    }).flat();
     const end = start + (bars + 1) * count * step;
     targets.forEach((target, i) => { target.deadline = targets[i + 1]?.time ?? end; });
-    return { start, step, count, accents, tolerance, window, targets, end };
+    return { start, step, count, bars, rhythm, accents, tolerance, window, targets, end };
   }
   function score(plan, notes, expected, first, last = first) {
     // Stay on the current chord until it passes, or the next chord's beat arrives.
@@ -154,6 +168,7 @@
   }
   let access = null, port = null, desired = "", failedPort = null, midiEpoch = 0, portEpoch = 0;
   const midiSize = $("Size"), midiSizePref = "kt_midi_keyboard_size_v1";
+  const midiPortPref = "kt_midi_last_input_v1";
   try {
     const saved = localStorage.getItem(midiSizePref);
     if ([...midiSize.options].some(option => option.value === saved)) midiSize.value = saved;
@@ -300,6 +315,7 @@
     setSkipped(button, event.key === "ArrowDown");
   });
   const hitMode = () => $("Target").value;
+  const selectedRhythm = () => rhythmsFor(meterFor($("Meter").value).count).find(r => r.id === hitMode());
   const heldNotes = () => [...new Set(held.values())];
   const midiHeld = n => heldNotes().includes(n);
   window.KTPractice = {
@@ -371,6 +387,7 @@
       slot: target.slot, beat: target.beat, expectedMidi: [...target.notes],
       targetMs: relativeMs(target.time), opensMs: relativeMs(target.time - active.plan.window),
       deadlineMs: relativeMs(target.deadline),
+      ...(target.releaseAt == null ? {} : { releaseMs: relativeMs(target.releaseAt) }),
     } : null;
   }
   function tracePlan(reason) {
@@ -479,7 +496,14 @@
     const mode = hitMode();
     const label = eighths ? "Count" : "Beat";
     $("Target").replaceChildren(...Array.from({length:count}, (_, i) => new Option(label + " " + (i + 1), String(i + 1))), new Option("Rotate 1–" + count, "rotate"));
-    $("Target").value = mode === "rotate" ? mode : String(Math.min(Number(mode) || 1, count));
+    const choices = rhythmsFor(count);
+    if (choices.length) {
+      const group = document.createElement("optgroup");
+      group.label = "Rhythm patterns";
+      group.append(...choices.map(r => new Option(r.label, r.id)));
+      $("Target").append(group);
+    }
+    $("Target").value = mode === "rotate" || choices.some(r => r.id === mode) ? mode : String(Math.min(Number(mode) || 1, count));
     $("TempoLabel").textContent = split === 3 ? "BPM (♩.)" : eighths ? "BPM (♪)" : "BPM";
     beats = Array.from({length:count}, (_, i) => {
       const el = document.createElement("span");
@@ -493,7 +517,12 @@
     refreshIdle();
   }
   function refreshIdle() {
-    renderBeats(hitMode() === "rotate" ? 0 : Number(hitMode()) - 1);
+    const rhythm = selectedRhythm();
+    for (const [i, el] of beats.entries()) {
+      el.classList.toggle("rhythm-hit", !!rhythm?.hits.includes(i + 1));
+      el.classList.toggle("rhythm-hold", !!(rhythm?.through && i > 0 && i < rhythm.through));
+    }
+    renderBeats(rhythm ? rhythm.hits[0] - 1 : hitMode() === "rotate" ? 0 : Number(hitMode()) - 1);
   }
   function resetAttempt() {
     attempt = null;
@@ -584,11 +613,12 @@
     if (audio.state !== "running") await audio.resume();
     if (audio.state !== "running") throw new Error("Audio not running");
   }
-  function tone(hz, when, duration, volume, type = "sine") {
+  function tone(hz, when, duration, volume, type = "sine", sustain = false) {
     const osc = audio.createOscillator(), gain = audio.createGain();
     osc.type = type; osc.frequency.value = hz;
     gain.gain.setValueAtTime(.0001, when);
     gain.gain.exponentialRampToValueAtTime(volume, when + .009);
+    if (sustain) gain.gain.setValueAtTime(volume, when + Math.max(.009, duration - .045));
     gain.gain.exponentialRampToValueAtTime(.0001, when + duration);
     osc.connect(gain); gain.connect(audio.destination);
     audioNodes.add(osc);
@@ -704,8 +734,8 @@
       scheduleClick(plan, n, audioStart + n * plan.step / 1000);
     }
   }
-  function soundChord(notes, when, length) {
-    for (const n of notes) tone(440 * 2 ** ((n - 69) / 12), when, length, .21 / notes.length, "triangle");
+  function soundChord(notes, when, length, sustain = false) {
+    for (const n of notes) tone(440 * 2 ** ((n - 69) / 12), when, length, .21 / notes.length, "triangle", sustain);
   }
   function updatePracticeGuide(plan) {
     const next = plan.targets.findIndex(t => !t.result);
@@ -716,7 +746,7 @@
       guideNotes = notes;
       paintKeys();
     }
-    displaySlot(next < 0 ? plan.targets.length - 1 : next);
+    displaySlot((plan.targets[next] || plan.targets.at(-1)).barIndex);
     return next;
   }
   function result(data, attacks) {
@@ -747,10 +777,42 @@
     renderBeats(next < 0 ? -1 : active.plan.targets[next].beat - 1, pulse, false, glowBeat);
     return false;
   }
+  function finishHold(clock) {
+    const hold = active?.holding;
+    if (!hold || clock < hold.until) return false;
+    active.holding = null;
+    traceDecision(hold.scored.target, hold.scored.result, "held through target counts",
+      hold.notes, hold.first, hold.last, "midi");
+    result(hold.scored, hold.attacks);
+    return true;
+  }
+  function failHold(target, notes, first, last, message = "Released too soon") {
+    traceDecision(target, "wrong", message.toLowerCase(), notes, first, last, "midi");
+    startRound(false, message, "wrong");
+    return true;
+  }
   function submit(notes, first, last, attacks, source = "midi") {
     if (!practiceRunning()) return;
+    if (selectedRhythm()?.through && source !== "midi") {
+      feedback("Use MIDI to hold the chord");
+      return;
+    }
     const scored = score(active.plan, notes, [], first, last);
     if (scored) {
+      if (scored.result !== "wrong" && scored.target.releaseAt != null) {
+        const until = scored.target.releaseAt - active.plan.tolerance / 2;
+        if (first > scored.target.time + active.plan.window) {
+          return failHold(scored.target, notes, first, last, "Start the hold on 1");
+        }
+        const stillHeld = new Set(heldAttacks.values());
+        if (last >= until || ![...attacks].every(attack => stillHeld.has(attack))) {
+          return failHold(scored.target, notes, first, last);
+        }
+        active.holding = { scored, notes, first, last, attacks, until };
+        feedback("Hold through " + active.plan.rhythm.through);
+        finishHold(performance.now());
+        return false;
+      }
       if (recording) traceDecision(scored.target, scored.result,
         scored.result !== "wrong" ? "matched"
           : !sameVoicing(uniqueNotes(notes), scored.target.notes) ? "notes or voicing differ" : "notes spread too far apart",
@@ -800,8 +862,13 @@
         releaseLiveVoice(msg.key, sustainFadeMs / 1000);
       } else if (wasHeld) releaseLiveVoice(msg.key, .13);
       const releasedAttack = heldAttacks.get(msg.key);
+      const incompleteHold = active?.holding;
+      finishHold(clock);
       held.delete(msg.key);
       heldAttacks.delete(msg.key);
+      if (incompleteHold && active.holding === incompleteHold && incompleteHold.attacks.has(releasedAttack)) {
+        failHold(incompleteHold.scored.target, incompleteHold.notes, incompleteHold.first, incompleteHold.last);
+      }
       if (attempt?.down.delete(releasedAttack) && !attempt.down.size) {
         // Only releases from this chord matter. Older held notes and pedal tails are separate.
         const target = active?.plan.targets.find(t => !t.result);
@@ -823,14 +890,24 @@
     startLiveVoice(msg.key, msg.note, velocity);
     syncHeld();
     if (!practiceRunning()) return;
-    if (attempt && clock - attempt.first > NOTE_SPREAD && flushAttempt()) {
+    finishHold(clock);
+    if (active.holding) {
+      logNote("holding chord");
+      return;
+    }
+    const target = pendingTarget();
+    if (attempt && (clock - attempt.first > NOTE_SPREAD
+      || (active.plan.rhythm?.hits.length > 1 && target && clock >= target.deadline && attempt.last < target.deadline))
+      && flushAttempt()) {
       logNote("previous attempt restarted practice");
       return;
     }
     if (!attempt) {
       // A chord is built from fresh key presses, never from the whole held keyboard.
       attempt = { first: clock, last: clock, notes: new Set(), attacks: new Set(), down: new Set() };
-      flushTimer = setTimeout(flushAttempt, NOTE_SPREAD + 12);
+      const collection = active.plan.rhythm?.hits.length > 1
+        ? Math.min(NOTE_SPREAD + 12, active.plan.step * .70) : NOTE_SPREAD + 12;
+      flushTimer = setTimeout(flushAttempt, collection);
     }
     logNote("collected");
     attempt.last = Math.max(clock, attempt.last);
@@ -847,13 +924,25 @@
       frame = requestAnimationFrame(tick);
       return;
     }
+    if (finishHold(now)) {
+      frame = requestAnimationFrame(tick);
+      return;
+    }
     const { plan, demo } = active;
     const index = Math.floor((now - plan.start) / plan.step);
     const bar = Math.floor(index / plan.count) - 1;
-    const position = demo ? clamp(bar, 0, plan.targets.length - 1) : updatePracticeGuide(plan);
-    const state = position < 0 ? null : plan.targets[position];
-    if (demo) displaySlot(position);
+    const previewBar = clamp(bar, 0, plan.bars - 1);
+    const hitsPerBar = plan.rhythm?.hits.length ?? 1;
+    const demoStart = previewBar * hitsPerBar;
+    const state = demo ? (plan.targets.slice(demoStart, demoStart + hitsPerBar).findLast(t => t.time <= now) || plan.targets[demoStart])
+      : plan.targets[updatePracticeGuide(plan)] || null;
+    if (demo) displaySlot(previewBar);
     if (!demo && state && now >= state.deadline) {
+      if (plan.rhythm?.hits.length > 1 && attempt && attempt.last < state.deadline) {
+        const restarted = flushAttempt();
+        if (restarted) return;
+        if (state.result) { frame = requestAnimationFrame(tick); return; }
+      }
       // Give an in-window attack time to finish grading, but never accept a note past the cutoff.
       if (!attempt || attempt.first >= state.deadline || now > attempt.first + NOTE_SPREAD + 18) {
         if (recording) traceDecision(state, "miss", attempt ? "cutoff with ungraded notes" : "cutoff without a graded chord",
@@ -862,12 +951,13 @@
         return;
       }
     }
-    const pulse = index >= 0 && index < (plan.targets.length + 1) * plan.count ? index % plan.count : -1;
+    const pulse = index >= 0 && index < (plan.bars + 1) * plan.count ? index % plan.count : -1;
     if (index >= plan.count && !active.go) {
       active.go = true;
       if (demo || lastFeedback.includes("Count in")) feedback(demo ? "Example playing" : "Your turn");
     }
-    const showingDemo = demo && bar >= 0 && bar < plan.targets.length && now >= state.time && now < state.time + Math.min(460, plan.step * .72);
+    const showingDemo = demo && bar >= 0 && bar < plan.bars && now >= state.time
+      && now < (state.releaseAt ?? state.time + Math.min(460, plan.step * .72));
     const highlighted = showingDemo ? state.notes : [];
     if (demoNotes !== highlighted && (demoNotes.length || highlighted.length)) {
       demoNotes = highlighted;
@@ -886,7 +976,7 @@
   }
   function buildPass(start, bpm, beat, meter, loop) {
     const plan = makePlan(start, bpm, beat, sequence.length, meter);
-    plan.targets.forEach((t, i) => Object.assign(t, sequence[i]));
+    plan.targets.forEach(t => Object.assign(t, sequence[t.barIndex]));
     if (loop) {
       const firstBeatOffset = (plan.targets[0].beat - 1) * plan.step;
       plan.targets.at(-1).deadline = plan.end + firstBeatOffset;
@@ -894,12 +984,12 @@
     return plan;
   }
   function queuePassClicks(plan, audioStart, first = 0) {
-    const total = (plan.targets.length + 1) * plan.count;
+    const total = (plan.bars + 1) * plan.count;
     for (let i = first; i < total; i++) scheduleClick(plan, i, audioStart + i * plan.step / 1000);
   }
   function queueFollowingPass(session) {
     const {plan, audioStart, bpm, beat, meter} = session;
-    const duration = plan.targets.length * plan.count * plan.step;
+    const duration = plan.bars * plan.count * plan.step;
     const next = buildPass(plan.start + duration, bpm, beat, meter, true);
     const nextAudio = audioStart + duration / 1000;
     queuePassClicks(next, nextAudio, next.count); // No extra count-in between successful passes.
@@ -929,13 +1019,18 @@
     renderResults(demo ? null : plan);
     queuePassClicks(plan, audioStart);
     if (loop) queueFollowingPass(active);
-    if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000, Math.min(.46, plan.step * .72 / 1000));
+    if (demo) for (const t of plan.targets) soundChord(t.notes, audioStart + (t.time - start) / 1000,
+      t.releaseAt == null ? Math.min(.46, plan.step * .72 / 1000) : (t.releaseAt - t.time) / 1000, t.releaseAt != null);
     feedback(reason ? reason + " · Count in again" : "Count in · 1 bar", kind);
     tick();
   }
   async function launch(demo) {
     refreshBank();
     if (active || launchPending || !sequence.length) return;
+    if (!demo && selectedRhythm()?.through && !port) {
+      feedback("Connect MIDI to practice a hold");
+      return;
+    }
     const token = ++runId;
     launchPending = true;
     setRoundMode(demo ? "demo" : "practice");
@@ -977,7 +1072,7 @@
     if (!next && desired) $("Port").prepend(new Option("Disconnected", desired));
     $("Port").value = desired;
     $("PortLabel").hidden = !ports.length;
-    if (next === port && port) return;
+    if (next === port && port && next !== failedPort) return;
     const previous = port;
     detach();
     if (previous && active && !active.demo && !active.listen) stop("MIDI input changed");
@@ -1005,14 +1100,23 @@
         processPedal(event.data);
       }
     };
-    announceMidi("Connected: " + (next.name || "MIDI keyboard"));
-    Promise.resolve().then(() => stillCurrent() && next.open()).catch(() => {
+    announceMidi("Opening: " + (next.name || "MIDI keyboard"));
+    Promise.resolve().then(async () => {
+      if (!stillCurrent()) return;
+      await next.open();
+      if (!stillCurrent() || next.state !== "connected") return;
+      try { localStorage.setItem(midiPortPref, next.id); } catch {}
+      announceMidi("Connected: " + (next.name || "MIDI keyboard"));
+    }).catch(() => {
       if (!stillCurrent()) return;
       failedPort = next;
       refreshPorts();
     });
   }
-  function disconnect() {
+  function disconnect(forget = false) {
+    if (forget) {
+      try { localStorage.removeItem(midiPortPref); } catch {}
+    }
     midiEpoch++;
     if (access) access.onstatechange = null;
     access = null; desired = ""; failedPort = null;
@@ -1025,15 +1129,16 @@
     $("Connect").disabled = false;
     announceMidi("Not connected");
   }
-  async function connect() {
+  async function connect(lastInput = "") {
     if (access || $("Connect").disabled) return;
     if (!window.isSecureContext || !navigator.requestMIDIAccess) {
       announceMidi("Web MIDI unavailable here. Try Chrome or Edge over HTTPS.");
       return;
     }
     const epoch = ++midiEpoch;
+    desired = lastInput;
     $("Connect").disabled = true; $("Disconnect").hidden = false;
-    announceMidi("Waiting for MIDI permission…");
+    announceMidi(lastInput ? "Reconnecting MIDI…" : "Waiting for MIDI permission…");
     try {
       const result = await navigator.requestMIDIAccess({ sysex: false });
       if (epoch !== midiEpoch) return;
@@ -1046,14 +1151,25 @@
       announceMidi(e?.name === "NotAllowedError" || e?.name === "SecurityError" ? "MIDI permission denied" : "Could not connect MIDI");
     }
   }
+  async function restoreMidi() {
+    if (access || $("Connect").disabled || !window.isSecureContext || !navigator.requestMIDIAccess) return;
+    const epoch = midiEpoch;
+    let lastInput, permission;
+    try {
+      lastInput = localStorage.getItem(midiPortPref);
+      if (!lastInput) return;
+      permission = await navigator.permissions?.query({ name: "midi", sysex: false });
+    } catch { return; } // Unsupported permission query or storage: keep manual Connect available.
+    if (epoch === midiEpoch && permission?.state === "granted") await connect(lastInput);
+  }
   $("Open").addEventListener("click", () => open() ? closePractice() : openPractice());
   $("Midi").addEventListener("click", () => {
     if (active || launchPending) stop("Stopped");
     dialog.showModal();
   });
   dismissOnBackdrop(dialog, () => dialog.close());
-  $("Connect").addEventListener("click", connect);
-  $("Disconnect").addEventListener("click", disconnect);
+  $("Connect").addEventListener("click", () => connect());
+  $("Disconnect").addEventListener("click", () => disconnect(true));
   $("Port").addEventListener("change", () => { desired = $("Port").value; failedPort = null; refreshPorts(); });
   pianoSwitch.addEventListener("change", async () => {
     const request = ++soundRequest;
@@ -1129,7 +1245,9 @@
   });
   refreshMeter();
   announceMidi("Not connected");
+  restoreMidi();
   window.addEventListener("pagehide", () => { stop(); disconnect(); });
+  window.addEventListener("pageshow", event => { if (event.persisted) restoreMidi(); });
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) return;
     if (active || launchPending) stop("Paused when you left the tab");

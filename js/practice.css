@@ -97,6 +97,8 @@ body.kt-practicing:not(.kt-running-round) #memoryGrid:not(.is-editing) .memBtn.f
   font-variant-numeric: tabular-nums; border: 1px solid rgba(255,255,255,.15); border-radius: 10px; background: rgba(255,255,255,.05);
 }
 .kt-beats span.target { border-color: rgba(29,185,84,.9); color: white; }
+.kt-beats span.rhythm-hit { box-shadow: inset 0 -2px var(--kt-demo); }
+.kt-beats span.rhythm-hold { box-shadow: inset 0 -2px var(--kt-player); }
 .kt-beats span.pulse { color: #16192a; background: #c6cee9; border-color: #c6cee9; }
 .kt-beats span.example { color: #1e170b; background: var(--kt-demo); border-color: var(--kt-demo); }
 .kt-beats span.played { color: #091f1b; background: var(--kt-player); border-color: var(--kt-player); }

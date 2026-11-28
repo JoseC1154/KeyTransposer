@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v32-practice-reverse-order";
+const CACHE_NAME = "piano-transposer-v33-practice-rhythm-midi-restore";
 const ASSETS = [
   "./",
   "./index.html",

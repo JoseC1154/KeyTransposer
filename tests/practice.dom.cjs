@@ -12,7 +12,7 @@ const slots = [
   { slot: 4, name: 'G major', midis: [55,59,62] },
   { slot: 11, name: 'F major', midis: [53,57,60] }
 ];
-async function setup(t, entries = slots) {
+async function setup(t, entries = slots, midiPrefs = {}) {
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on('jsdomError', e => errors.push(e));
@@ -45,7 +45,13 @@ async function setup(t, entries = slots) {
   }
   w.AudioContext = Audio;
   const port = { id:'yc', name:'YC Series Port 1', state:'connected', open(){}, close(){} };
-  const usb = { inputs:new Map([['yc',port]]) };
+  const usb = { inputs:new Map([['yc',port], ...(midiPrefs.otherPort ? [[midiPrefs.otherPort.id,midiPrefs.otherPort]] : [])]) };
+  if (midiPrefs.lastInput) w.localStorage.setItem('kt_midi_last_input_v1',midiPrefs.lastInput);
+  if (midiPrefs.permissions) w.navigator.permissions = { query:async descriptor => {
+    assert.equal(descriptor.name,'midi');
+    assert.equal(descriptor.sysex,false);
+    return {state:midiPrefs.permissions};
+  }};
   let asked = 0, pending = null;
   w.navigator.requestMIDIAccess = async options => { assert.equal(options.sysex,false); asked++; return pending || usb; };
   for (const path of ['utils','chordDetection','chordAlternates','main','practice','memory-editor']) vm.runInContext(readFileSync(join(base,'js',path+'.js'),'utf8'),dom.getInternalVMContext());
@@ -113,6 +119,58 @@ test('Unplugging before release stops practice and clears held notes', async t =
   assert.equal(x.id('Stop').hidden,true);
   assert.equal(x.piano.querySelectorAll('.kt-midi-held').length,0);
 });
+test('MIDI remembers the exact connected port across page teardown, then forgets on Disconnect', async t => {
+  const x=await setup(t,slots,{lastInput:'yc',permissions:'granted'});
+  assert.equal(x.asked(),1);
+  assert.equal(x.id('MidiStatus').textContent,'Connected: YC Series Port 1');
+  x.w.dispatchEvent(new x.w.PageTransitionEvent('pagehide',{persisted:true}));
+  assert.equal(x.port.onmidimessage,null);
+  assert.equal(x.w.localStorage.getItem('kt_midi_last_input_v1'),'yc');
+  x.w.dispatchEvent(new x.w.PageTransitionEvent('pageshow',{persisted:true}));
+  await calm();
+  assert.equal(x.asked(),2);
+  assert.equal(typeof x.port.onmidimessage,'function');
+  x.click('Disconnect');
+  assert.equal(x.w.localStorage.getItem('kt_midi_last_input_v1'),null);
+  x.w.dispatchEvent(new x.w.PageTransitionEvent('pageshow',{persisted:true}));
+  await calm();
+  assert.equal(x.asked(),2);
+});
+
+test('MIDI does not initiate a permission prompt at startup', async t => {
+  const x=await setup(t,slots,{lastInput:'yc',permissions:'prompt'});
+  assert.equal(x.asked(),0);
+  assert.equal(x.id('Connect').disabled,false);
+  await x.midi();
+  assert.equal(x.asked(),1);
+  assert.equal(x.w.localStorage.getItem('kt_midi_last_input_v1'),'yc');
+});
+
+test('MIDI waits for the saved port rather than taking another input', async t => {
+  const x=await setup(t,slots,{lastInput:'saved',permissions:'granted'});
+  assert.equal(x.asked(),1);
+  assert.equal(x.port.onmidimessage,undefined);
+  assert.equal(x.id('MidiStatus').textContent,'Input disconnected');
+  const saved={id:'saved',name:'Saved MIDI device',state:'connected',open(){},close(){}};
+  x.usb.inputs.set(saved.id,saved);
+  x.usb.onstatechange();
+  await calm();
+  assert.equal(typeof saved.onmidimessage,'function');
+  assert.equal(x.id('MidiStatus').textContent,'Connected: Saved MIDI device');
+  assert.equal(x.w.localStorage.getItem('kt_midi_last_input_v1'),'saved');
+});
+
+test('MIDI remembers a port only after it opens successfully', async t => {
+  const other={id:'broken',name:'Broken input',state:'connected',open(){return Promise.reject(new Error('Cannot open'));},close(){}};
+  const x=await setup(t,slots,{otherPort:other});
+  await x.midi();
+  assert.equal(x.w.localStorage.getItem('kt_midi_last_input_v1'),'yc');
+  x.set('Port','broken');
+  await calm();
+  assert.equal(x.w.localStorage.getItem('kt_midi_last_input_v1'),'yc');
+  assert.equal(x.id('MidiStatus').textContent,'Could not open input. Reconnect to try again.');
+});
+
 test('Canceling a permission request ignores its late resolution', async t => {
   const x=await setup(t);
   let allow;
@@ -1191,4 +1249,48 @@ test('Reverse plays filled unskipped slots high to low in Practice, Loop and Exa
   assert.match(x.id('Chord').textContent,/Slot 1 ·/);
   assert.match(x.id('Next').textContent,/Slot 11 ·/);
   assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
+});
+
+test('Hit 1 + 2 needs two fresh strikes of each chord before advancing to the next slot', async t => {
+  const x=await setup(t);
+  x.click('Open'); await x.midi(); await x.round('hits-12');
+  assert.deepEqual([...x.d.querySelectorAll('.kt-beats .rhythm-hit')].map(el=>el.textContent),['1','2']);
+  const hit = (time, notes) => {
+    x.at(time);
+    for (const n of notes) x.send(0x90,n,90);
+    for (const n of notes) x.send(0x80,n,0);
+  };
+  hit(3140,slots[0].midis);
+  assert.match(x.id('Chord').textContent,/Slot 1 ·/);
+  hit(3640,slots[0].midis);
+  assert.match(x.id('Chord').textContent,/Slot 4 ·/);
+  hit(5140,slots[1].midis);
+  const labels=[...x.id('Results').children].slice(0,4).map(el=>el.getAttribute('aria-label'));
+  assert.deepEqual(labels,['Slot 1: On time','Slot 1: On time','Slot 4: On time','Slot 4: pending']);
+});
+
+test('Hold 1–3 plays through beat 3 and requires a physically held MIDI chord in Practice', async t => {
+  const x=await setup(t,[slots[0]]);
+  x.click('Open'); x.set('Target','hold-13'); x.set('Tempo','120');
+  x.click('Start'); await calm();
+  assert.equal(x.id('Feedback').textContent,'Connect MIDI to practice a hold');
+  x.click('Demo'); await calm();
+  x.at(4520);
+  assert.equal(x.piano.querySelectorAll('.kt-example').length,3);
+  x.at(4641);
+  assert.equal(x.piano.querySelectorAll('.kt-example').length,0);
+  x.click('Stop'); await x.midi(); await x.round('hold-13');
+  x.at(6781);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  // Simulate the hold reaching its release marker before a browser frame.
+  await new Promise(resolve=>setTimeout(resolve,465));
+  assert.match(x.id('Feedback').textContent,/Hold through 3/);
+  x.at(8281);
+  assert.equal(x.id('Feedback').textContent,'On time');
+  for (const n of slots[0].midis) x.send(0x80,n,0);
+  x.click('Stop');
+  await x.round('hold-13'); x.at(10421);
+  for (const n of slots[0].midis) x.send(0x90,n,90);
+  for (const n of slots[0].midis) x.send(0x80,n,0);
+  assert.equal(x.id('Feedback').textContent,'Released too soon · Count in again');
 });
