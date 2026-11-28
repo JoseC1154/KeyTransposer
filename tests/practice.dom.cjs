@@ -609,7 +609,7 @@ test('Practice shows the target, keeps pedal tails distinct, and restarts on a w
   assert.equal(x.id('Results').children[0].getAttribute('aria-label'),'Slot 1: pending');
   x.send(0xb0,64,0);
   assert.deepEqual(notes('.kt-midi-sustain'),[]);
-  x.at(7280);
+  x.at(7520); // Retry cue lead (380 ms), then the normal count-in.
   for (const n of slots[0].midis) x.send(0x90,n,90);
   for (const n of slots[0].midis) x.send(0x80,n,64);
   assert.equal(x.id('Feedback').textContent,'On time');
@@ -968,4 +968,39 @@ test('Transpose slots blocks out-of-range shifts and leaves memory untouched on 
   assert.equal(x.w.localStorage.getItem('pct_state_v1'),saved);
   submit();
   assert.deepEqual(JSON.parse(x.w.localStorage.getItem('pct_state_v1')).bankChords[0][0].midis,[100,104,107]);
+});
+
+test('Wrong chord plays two descending tones before the retry click; Stop cancels both', async t => {
+  const x = await setup(t);
+  x.click('Open');
+  await x.midi();
+  await x.round();
+  x.at(3140);
+  const before = x.played.length;
+  x.send(0x90,61,90);
+  x.send(0x80,61,0);
+  assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
+  const [high, low, downbeat] = x.played.slice(before);
+  assert.deepEqual([high, low, downbeat].map(o => o.frequency.value), [494,330,1400]);
+  assert.ok(high.at < low.at && low.at < low.end && low.end < downbeat.at);
+  assert.ok(x.played.slice(0,before).every(o => o.end === 0));
+  x.click('Stop');
+  assert.ok(x.played.every(o => o.end === 0));
+});
+
+test('An expired chord plays two equal tones once, then counts in from the first slot', async t => {
+  const x = await setup(t);
+  x.click('Open');
+  await x.round();
+  const before = x.played.length;
+  x.at(5139);
+  assert.equal(x.played.length,before);
+  x.at(5140);
+  assert.equal(x.id('Feedback').textContent,'Missed · Count in again');
+  assert.match(x.id('Chord').textContent,/Slot 1 ·/);
+  const [first, second, downbeat] = x.played.slice(before);
+  assert.deepEqual([first, second, downbeat].map(o => o.frequency.value), [660,660,1400]);
+  assert.ok(first.end < second.at && second.end < downbeat.at);
+  x.at(5200);
+  assert.equal(x.played.filter(o => o.frequency.value === 660).length,2);
 });

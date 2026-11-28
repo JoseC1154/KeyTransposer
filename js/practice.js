@@ -522,11 +522,26 @@
     tone(position === 0 ? 1400 : accent ? 1150 : 900, when, .055,
       position === 0 ? .28 : accent ? .22 : .17, "triangle");
   }
-  function clocks() {
-    const audioStart = audio.currentTime + .14;
+  function playRetryCue(kind) {
+    const when = audio.currentTime + .012;
+    if (kind === "wrong") {
+      // A low, descending double buzz contrasts with the high metronome click.
+      tone(494, when, .13, .38, "triangle");
+      tone(330, when + .16, .16, .38, "triangle");
+    } else if (kind === "miss") {
+      // Two equal pulses signal that the window ran out.
+      tone(660, when, .095, .39, "triangle");
+      tone(660, when + .17, .095, .39, "triangle");
+    } else {
+      return 0;
+    }
+    return .38; // Let the cue finish before the new count-in.
+  }
+  function clocks(lead = .14) {
+    const audioStart = audio.currentTime + lead;
     const out = audio.getOutputTimestamp?.();
-    const offset = out?.performanceTime > 0 ? out.performanceTime + (audioStart - out.contextTime) * 1000 - performance.now() : 140;
-    const start = performance.now() + (offset > 0 && offset < 500 ? offset : 140);
+    const offset = out?.performanceTime > 0 ? out.performanceTime + (audioStart - out.contextTime) * 1000 - performance.now() : lead * 1000;
+    const start = performance.now() + (offset > 0 && offset < (lead + .36) * 1000 ? offset : lead * 1000);
     return { audioStart, start };
   }
   let lastTap = null;
@@ -793,7 +808,8 @@
     glowBeat = -1; glowUntil = 0; glowSlot = -1;
     paintPlayingSlot(-1);
     guideNotes = []; demoNotes = []; touchNotes = []; touchUntil = 0;
-    const { audioStart, start } = clocks();
+    const cueLead = playRetryCue(kind);
+    const { audioStart, start } = clocks(cueLead || undefined);
     const bpm = practiceTempo(), beat = hitMode(), meter = $("Meter").value;
     const loop = !demo && $("Loop").getAttribute("aria-pressed") === "true";
     const plan = buildPass(start, bpm, beat, meter, loop);
