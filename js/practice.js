@@ -400,6 +400,10 @@
     });
   }
   recordSwitch.checked = false;
+  // A mouse tap on Record is usually followed by the Practice shortcut.
+  recordSwitch.addEventListener("click", event => {
+    if (event.detail > 0) practice.focus({ preventScroll: true });
+  });
   recordSwitch.addEventListener("change", () => {
     recording = recordSwitch.checked;
     if (recording) {
@@ -1091,6 +1095,21 @@
   $("Demo").addEventListener("click", () => launch(true));
   $("Start").addEventListener("click", () => launch(false));
   $("Stop").addEventListener("click", () => stop("Stopped"));
+  document.addEventListener("keydown", event => {
+    if (!(event.code === "Space" || event.key === " ") || !open() || event.defaultPrevented
+      || event.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (document.querySelector("dialog[open], .modal:not([hidden])")) return;
+    const target = event.target;
+    if (target?.isContentEditable || target?.closest?.("input:not([type='checkbox']):not([type='radio']), textarea, select, [role='textbox']")) return;
+    // Keep native Space activation for keyboard-focused controls other than the transport.
+    if (target?.closest?.("button:focus-visible:not(#ktStart):not(#ktStop):not(#ktOpen), summary:focus-visible, input:focus-visible, [role='button']:focus-visible")) return;
+    const running = roundMode === "practice" && (active || launchPending);
+    if (!running && (active || launchPending || $("Start").disabled)) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    if (running) stop("Stopped");
+    else launch(false);
+  });
   $("Meter").addEventListener("change", () => { resetTempoTaps(); refreshMeter(); renderResults(); });
   $("Target").addEventListener("change", () => { refreshIdle(); renderResults(); });
   $("Play").addEventListener("click", async event => {

@@ -59,7 +59,7 @@
       <div id="commandDeck" class="deckControls calculatorDeck">
         
 
-        <section id="ktPractice" hidden aria-label="Practice controls">
+        <section id="ktPractice" hidden tabindex="-1" aria-label="Practice controls">
           <div class="kt-setup">
             <div class="kt-slot-label"><strong id="ktChord">No saved chords</strong><small id="ktNext"></small></div>
             <label>Meter <select id="ktMeter" class="ctrl mini">
@@ -81,8 +81,8 @@
             <button class="ctrl mini" id="ktClick" type="button" aria-pressed="false">Metronome</button>
             <button class="ctrl mini" id="ktDemo" type="button">Example</button>
             <button class="ctrl mini" id="ktLoop" type="button" aria-pressed="false">Loop</button>
-            <button class="ctrl mini accent" id="ktStart" type="button">Start</button>
-            <button class="ctrl mini" id="ktStop" type="button" hidden>Stop</button>
+            <button class="ctrl mini accent" id="ktStart" type="button" aria-keyshortcuts="Space" title="Start (Space)">Start</button>
+            <button class="ctrl mini" id="ktStop" type="button" aria-keyshortcuts="Space" title="Stop (Space)" hidden>Stop</button>
             <button class="ctrl mini" id="ktPlay" type="button" disabled>Play selected</button>
           </div>
           <div class="kt-feedback" id="ktFeedback" role="status"></div>

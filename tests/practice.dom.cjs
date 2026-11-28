@@ -1092,3 +1092,33 @@ test('Timing log distinguishes early ignored notes, a timeout and an on-screen m
   x.click('TimingRecord');
   assert.equal(x.id('TimingDownload').disabled,true);
 });
+
+test('Space starts and stops Practice, including count-in, without repeating or triggering elsewhere', async t => {
+  const x = await setup(t);
+  const space = (target = x.d.body, options = {}) => {
+    const event = new x.w.KeyboardEvent('keydown', { code:'Space', key:' ', bubbles:true, cancelable:true, ...options });
+    target.dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  assert.equal(space(),false);
+  x.click('Open');
+  const field = x.d.querySelector('#promptInput') || x.id('TimingRecord');
+  assert.equal(space(field),false);
+  x.id('MidiDialog').showModal();
+  assert.equal(space(),false);
+  x.id('MidiDialog').close();
+  const custom = x.d.querySelector('#menuModal');
+  custom.hidden = false;
+  assert.equal(space(),false);
+  custom.hidden = true;
+  assert.equal(space(x.d.body,{ctrlKey:true}),false);
+  assert.equal(space(x.id('Open')),true);
+  await calm();
+  assert.match(x.id('Feedback').textContent,/Count in/);
+  assert.equal(space(x.d.body,{repeat:true}),true);
+  assert.equal(x.id('Stop').hidden,false);
+  x.id('Stop').focus();
+  assert.equal(space(x.id('Stop')),true);
+  assert.equal(x.id('Feedback').textContent,'Stopped');
+  assert.equal(x.id('Stop').hidden,true);
+});
