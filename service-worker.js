@@ -1,4 +1,4 @@
-const CACHE_NAME = "piano-transposer-v27-practice-retry-cues";
+const CACHE_NAME = "piano-transposer-v28-practice-timing-log";
 const ASSETS = [
   "./",
   "./index.html",

@@ -348,6 +348,79 @@
     },
   };
 
+  // Opt-in, in-memory trace. No audio, device name, account data, or uploads.
+  const traceLimit = 3000;
+  const recordSwitch = $("TimingRecord"), downloadTrace = $("TimingDownload");
+  let trace = null, recording = false;
+  const relativeMs = value => value == null ? null : value - trace.origin;
+  const practiceRunning = () => active && !active.demo && !active.listen;
+  const pendingTarget = () => active.plan.targets.find(t => !t.result);
+  const validStamp = (stamp, now) => Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000;
+  function traceEvent(type, fields, time = performance.now()) {
+    if (!recording) return;
+    if (trace.events.length === traceLimit) {
+      trace.events.shift();
+      trace.dropped++;
+    }
+    trace.events.push({ type, atMs: relativeMs(time), ...fields });
+    if (downloadTrace.disabled) downloadTrace.disabled = false;
+  }
+  function targetTimes(target) {
+    return target ? {
+      slot: target.slot, beat: target.beat, expectedMidi: [...target.notes],
+      targetMs: relativeMs(target.time), opensMs: relativeMs(target.time - active.plan.window),
+      deadlineMs: relativeMs(target.deadline),
+    } : null;
+  }
+  function tracePlan(reason) {
+    if (!recording || !practiceRunning()) return;
+    const { plan, audioStart, bpm, beat, meter, loop } = active;
+    const output = audio.getOutputTimestamp?.();
+    traceEvent("plan", {
+      reason, bpm, hitOn: beat, meter, loop, beatLengthMs: plan.step,
+      onTimeToleranceMs: plan.tolerance, maxChordSpreadMs: NOTE_SPREAD,
+      countInStartMs: relativeMs(plan.start),
+      metronomeStartAudioSec: audioStart,
+      audioOutputSample: output?.performanceTime > 0 ? {
+        audioSec: output.contextTime, clockMs: relativeMs(output.performanceTime),
+      } : null,
+      baseLatencyMs: Number.isFinite(audio.baseLatency) ? audio.baseLatency * 1000 : null,
+      outputLatencyMs: Number.isFinite(audio.outputLatency) ? audio.outputLatency * 1000 : null,
+      targets: plan.targets.map(targetTimes),
+    });
+  }
+  function traceDecision(target, outcome, reason, notes = [], first, last, source = null) {
+    if (!recording) return;
+    traceEvent("decision", {
+      target: targetTimes(target), source, outcome, reason, playedMidi: uniqueNotes(notes),
+      firstMs: relativeMs(first), lastMs: relativeMs(last),
+      firstOffsetMs: target && first != null ? first - target.time : null,
+      lastOffsetMs: target && last != null ? last - target.time : null,
+      spreadMs: first != null && last != null ? last - first : null,
+    });
+  }
+  recordSwitch.checked = false;
+  recordSwitch.addEventListener("change", () => {
+    recording = recordSwitch.checked;
+    if (recording) {
+      trace = { origin: performance.now(), events: [], dropped: 0 };
+      downloadTrace.disabled = true;
+      tracePlan("recording enabled during practice");
+    }
+  });
+  downloadTrace.addEventListener("click", () => {
+    if (!trace?.events.length) return;
+    const data = { format: "keytransposer-practice-timing-v1", droppedEvents: trace.dropped, events: trace.events };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "keytransposer-timing.json";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
   function feedback(message, kind = "") {
     if (lastFeedback === message && $("Feedback").dataset.kind === kind) return;
     lastFeedback = message;
@@ -441,6 +514,7 @@
     runId++;
     launchPending = false;
     cancelAnimationFrame(frame);
+    if (recording && practiceRunning()) traceEvent("stop", { reason: message || "practice closed" });
     active = null;
     setRoundMode(null);
     for (const button of lockedControls) button.disabled = false;
@@ -666,12 +740,22 @@
     renderBeats(next < 0 ? -1 : active.plan.targets[next].beat - 1, pulse, false, glowBeat);
     return false;
   }
-  function submit(notes, first, last, attacks) {
-    if (!active || active.demo || active.listen) return;
+  function submit(notes, first, last, attacks, source = "midi") {
+    if (!practiceRunning()) return;
     const scored = score(active.plan, notes, [], first, last);
-    if (scored) return result(scored, attacks);
-    const target = active.plan.targets.find(t => !t.result);
-    if (target && last >= target.deadline) {
+    if (scored) {
+      if (recording) traceDecision(scored.target, scored.result,
+        scored.result !== "wrong" ? "matched"
+          : !sameVoicing(uniqueNotes(notes), scored.target.notes) ? "notes or voicing differ" : "notes spread too far apart",
+        notes, first, last, source);
+      return result(scored, attacks);
+    }
+    const target = pendingTarget();
+    const expired = target && last >= target.deadline;
+    if (recording) traceDecision(target, expired ? "miss" : "ignored",
+      !target ? "no pending chord" : expired ? "chord reached cutoff" : "started before window",
+      notes, first, last, source);
+    if (expired) {
       startRound(false, statusText.miss, "miss");
       return true;
     }
@@ -687,8 +771,21 @@
     clearTimeout(flushTimer);
     submit([...batch.notes], batch.first, batch.last, batch.attacks);
   }
-  function processNote(msg, clock, velocity) {
+  function processNote(msg, clock, velocity, receivedAt, stamp) {
+    const traceNote = recording && practiceRunning();
+    const logNote = reason => {
+      if (!traceNote) return;
+      const target = pendingTarget();
+      traceEvent(msg.down ? "note-on" : "note-off", {
+        midi: msg.note, channel: Number(msg.key.split(":")[0]) + 1, velocity, reason,
+        inputMs: relativeMs(clock), receivedMs: relativeMs(receivedAt),
+        timestampSource: validStamp(stamp, receivedAt) ? "MIDI event" : "handler clock",
+        receiveDelayMs: receivedAt - clock, slot: target?.slot ?? null,
+        targetMs: relativeMs(target?.time), offsetMs: target ? clock - target.time : null,
+      }, receivedAt);
+    };
     if (!msg.down) {
+      logNote(held.has(msg.key) ? "released" : "not held");
       const channel = Number(msg.key.split(":")[0]);
       const wasHeld = held.has(msg.key);
       if (wasHeld && pedalDown.has(channel)) {
@@ -707,25 +804,37 @@
       syncHeld();
       return;
     }
-    if (held.has(msg.key) || document.hidden) return;
+    if (held.has(msg.key) || document.hidden) {
+      logNote(document.hidden ? "tab hidden" : "duplicate note-on");
+      return;
+    }
     sustained.delete(msg.key);
     held.set(msg.key, msg.note);
     const attack = Symbol();
     heldAttacks.set(msg.key, attack);
     startLiveVoice(msg.key, msg.note, velocity);
     syncHeld();
-    if (!active || active.demo || active.listen || waitRelease) return;
+    if (!practiceRunning() || waitRelease) {
+      logNote("waiting for keys to release");
+      return;
+    }
     if (attempt && clock - attempt.first > NOTE_SPREAD) {
+      logNote("outside chord collection window");
       flushAttempt();
       waitRelease = true;
       return;
     }
     if (!attempt) {
       // Previously held keys don't count as a fresh attack.
-      if (held.size > 1) { waitRelease = true; return; }
+      if (held.size > 1) {
+        logNote("another key already held");
+        waitRelease = true;
+        return;
+      }
       attempt = { first: clock, last: clock, notes: new Set(), attacks: new Set() };
       flushTimer = setTimeout(() => { flushAttempt(); waitRelease = held.size > 0; }, NOTE_SPREAD + 12);
     }
+    logNote("collected");
     attempt.last = Math.max(clock, attempt.last);
     attempt.notes.add(msg.note);
     attempt.attacks.add(attack);
@@ -748,6 +857,8 @@
     if (!demo && state && now >= state.deadline) {
       // Give an in-window attack time to finish grading, but never accept a note past the cutoff.
       if (!attempt || attempt.first >= state.deadline || now > attempt.first + NOTE_SPREAD + 18) {
+        if (recording) traceDecision(state, "miss", attempt ? "cutoff with ungraded notes" : "cutoff without a graded chord",
+          attempt ? [...attempt.notes] : [], attempt?.first, attempt?.last, attempt ? "midi" : null);
         startRound(false, statusText.miss, "miss");
         return;
       }
@@ -798,6 +909,7 @@
   function advancePass(session) {
     Object.assign(session, session.following);
     session.go = true;
+    tracePlan("loop");
     queueFollowingPass(session);
   }
   function startRound(demo, reason = "", kind = "") {
@@ -814,6 +926,7 @@
     const loop = !demo && $("Loop").getAttribute("aria-pressed") === "true";
     const plan = buildPass(start, bpm, beat, meter, loop);
     active = { demo, loop, plan, audioStart, bpm, beat, meter, go: false, roundPicks: demo ? null : new Set() };
+    tracePlan(kind ? "retry: " + kind : "start");
     renderResults(demo ? null : plan);
     queuePassClicks(plan, audioStart);
     if (loop) queueFollowingPass(active);
@@ -882,8 +995,16 @@
       if (!stillCurrent() || next.state !== "connected") return;
       const msg = midiMessage(event.data);
       const now = performance.now(), stamp = event.timeStamp;
-      if (msg) processNote(msg, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now, event.data[2]);
-      else processPedal(event.data);
+      const clock = validStamp(stamp, now) ? stamp : now;
+      if (msg) processNote(msg, clock, event.data[2], now, stamp);
+      else {
+        if (recording && practiceRunning() && event.data?.length === 3
+          && (event.data[0] & 240) === 176 && event.data[1] === 64) {
+          traceEvent("sustain", { channel: (event.data[0] & 15) + 1, down: event.data[2] >= 64,
+            inputMs: relativeMs(clock), receivedMs: relativeMs(now) }, now);
+        }
+        processPedal(event.data);
+      }
     };
     announceMidi("Connected: " + (next.name || "MIDI keyboard"));
     Promise.resolve().then(() => stillCurrent() && next.open()).catch(() => {
@@ -976,7 +1097,7 @@
     const notes = uniqueNotes([...(playingPicks() || [])]);
     if (!notes.length) return;
     const now = performance.now(), token = runId, session = active, stamp = event.timeStamp;
-    if (submit(notes, Number.isFinite(stamp) && stamp > 0 && Math.abs(stamp - now) < 1000 ? stamp : now, now)) return;
+    if (submit(notes, validStamp(stamp, now) ? stamp : now, now, undefined, "on-screen")) return;
     touchNotes = notes; touchUntil = now + 340;
     paintKeys();
     setTimeout(() => paintKeys(), 350);

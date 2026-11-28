@@ -1004,3 +1004,91 @@ test('An expired chord plays two equal tones once, then counts in from the first
   x.at(5200);
   assert.equal(x.played.filter(o => o.frequency.value === 660).length,2);
 });
+
+async function readTimingDownload(x) {
+  let blob, filename;
+  x.w.URL.createObjectURL = value => { blob = value; return 'blob:timing-test'; };
+  x.w.URL.revokeObjectURL = () => {};
+  x.w.HTMLAnchorElement.prototype.click = function () { filename = this.download; };
+  x.click('TimingDownload');
+  assert.equal(filename,'keytransposer-timing.json');
+  const reader = new x.w.FileReader();
+  return await new Promise((resolve,reject) => {
+    reader.onload = () => resolve(JSON.parse(reader.result));
+    reader.onerror = reject;
+    reader.readAsText(blob);
+  });
+}
+
+test('Timing log is opt-in and compares actual MIDI attacks and grading with the target', async t => {
+  const x = await setup(t);
+  x.click('Open');
+  await x.midi();
+  await x.round();
+  x.at(3140);
+  x.send(0x90,61,90);
+  x.send(0x80,61,0);
+  assert.equal(x.id('TimingDownload').disabled,true);
+  x.click('Stop');
+
+  x.click('TimingRecord');
+  await x.round();
+  x.at(5280);
+  x.send(0x90,60,90,5270);
+  x.send(0x90,64,90,5274);
+  x.send(0x90,68,90,5278);
+  x.send(0x80,60,0);
+  x.send(0x80,64,0);
+  x.send(0x80,68,0);
+  assert.equal(x.id('Feedback').textContent,'Wrong chord · Count in again');
+  x.click('Stop');
+  const trace = await readTimingDownload(x);
+  assert.equal(trace.format,'keytransposer-practice-timing-v1');
+  assert.equal(trace.droppedEvents,0);
+  const [start,retry] = trace.events.filter(e=>e.type==='plan');
+  assert.equal(start.bpm,120);
+  assert.equal(start.meter,'4/4');
+  assert.deepEqual(start.targets[0],{slot:1,beat:1,expectedMidi:[60,64,67],targetMs:2140,opensMs:2008,deadlineMs:4140});
+  assert.equal(retry.reason,'retry: wrong');
+  const attacks = trace.events.filter(e=>e.type==='note-on');
+  assert.deepEqual(attacks.map(e=>[e.midi,e.offsetMs,e.receiveDelayMs,e.reason]),[
+    [60,-10,10,'collected'],[64,-6,6,'collected'],[68,-2,2,'collected'],
+  ]);
+  const [decision] = trace.events.filter(e=>e.type==='decision');
+  assert.deepEqual(decision.playedMidi,[60,64,68]);
+  assert.equal(decision.outcome,'wrong');
+  assert.equal(decision.reason,'notes or voicing differ');
+  assert.equal(decision.spreadMs,8);
+  assert.equal(trace.events.at(-1).type,'stop');
+});
+
+test('Timing log distinguishes early ignored notes, a timeout and an on-screen match', async t => {
+  const x = await setup(t);
+  x.click('Open');
+  x.click('TimingRecord');
+  await x.midi();
+  await x.round();
+  x.at(2900);
+  for (const n of [60,64,67]) x.send(0x90,n,90);
+  for (const n of [60,64,67]) x.send(0x80,n,0);
+  x.at(5140);
+  assert.equal(x.id('Feedback').textContent,'Missed · Count in again');
+  x.at(7520);
+  for (const n of [60,64,67]) x.tap(n);
+  x.click('Play');
+  await calm();
+  assert.equal(x.id('Feedback').textContent,'On time');
+  x.click('Stop');
+  x.click('TimingRecord');
+  const trace = await readTimingDownload(x);
+  const [ignored, timeout, matched] = trace.events.filter(e=>e.type==='decision');
+  assert.equal(ignored.reason,'started before window');
+  assert.equal(ignored.firstOffsetMs,-240);
+  assert.equal(timeout.outcome,'miss');
+  assert.equal(timeout.firstOffsetMs,null);
+  assert.equal(matched.outcome,'on');
+  assert.equal(matched.source,'on-screen');
+  assert.deepEqual(matched.playedMidi,[60,64,67]);
+  x.click('TimingRecord');
+  assert.equal(x.id('TimingDownload').disabled,true);
+});
